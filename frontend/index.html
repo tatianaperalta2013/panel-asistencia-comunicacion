@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Panel de Asistencia de Comunicación</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/estilos.css" />
+</head>
+<body>
+  <header class="barra">
+    <div class="marca">
+      <span class="marca-punto" aria-hidden="true"></span>
+      Panel de Asistencia
+    </div>
+    <div class="barra-usuario" id="barra-usuario" hidden>
+      <span id="nombre-usuario"></span>
+      <button class="btn-texto" id="btn-cerrar-sesion">Cerrar sesión</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- ===== LOGIN (HU2) ===== -->
+    <section class="vista tarjeta angosta" id="vista-login" hidden>
+      <h1>Iniciar sesión</h1>
+      <p class="sub">Contá cómo te sentís en la reunión, sin que nadie sepa que fuiste vos.</p>
+      <form id="form-login" novalidate>
+        <label>Usuario
+          <input name="usuario" autocomplete="username" required />
+        </label>
+        <label>Contraseña
+          <input name="password" type="password" autocomplete="current-password" required />
+        </label>
+        <p class="error" role="alert"></p>
+        <button class="btn" type="submit">Log in</button>
+      </form>
+      <p class="pie-form">¿No tenés cuenta? <button class="btn-texto" data-ir="registro">Registrarse</button></p>
+    </section>
+
+    <!-- ===== REGISTRO (HU1) ===== -->
+    <section class="vista tarjeta angosta" id="vista-registro" hidden>
+      <h1>Crear cuenta</h1>
+      <form id="form-registro" novalidate>
+        <label>Usuario
+          <input name="usuario" autocomplete="username" required />
+          <small>Entre 3 y 20 caracteres: letras, números, punto, guion o guion bajo</small>
+        </label>
+        <label>Email
+          <input name="email" type="email" autocomplete="email" required />
+        </label>
+        <label>Contraseña
+          <input name="password" type="password" autocomplete="new-password" required />
+          <small>Al menos 8 caracteres</small>
+        </label>
+        <label>Repetir contraseña
+          <input name="password2" type="password" autocomplete="new-password" required />
+        </label>
+        <p class="error" role="alert"></p>
+        <div class="fila-botones">
+          <button class="btn btn-secundario" type="button" data-ir="login">Back</button>
+          <button class="btn" type="submit">Crear usuario</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ===== HOME (HU3 y HU4) ===== -->
+    <section class="vista" id="vista-home" hidden>
+      <h1 class="titulo-home">¿A qué reunión vas?</h1>
+      <div class="grilla-home">
+        <div class="tarjeta">
+          <h2>Unirme a una reunión</h2>
+          <p class="sub">Pegá el link o el código que compartieron en el Meet.</p>
+          <form id="form-unirse" novalidate>
+            <label>Link o código
+              <input name="codigo" placeholder="Ej: K7M2QX" autocomplete="off" required />
+            </label>
+            <p class="error" role="alert"></p>
+            <button class="btn" type="submit">Ingresar</button>
+          </form>
+        </div>
+        <div class="tarjeta">
+          <h2>Nueva reunión</h2>
+          <p class="sub">Creá una sala y compartí el link con los participantes.</p>
+          <form id="form-crear" novalidate>
+            <label>Nombre (opcional)
+              <input name="nombre" placeholder="Ej: Clase PP3" maxlength="60" autocomplete="off" />
+            </label>
+            <p class="error" role="alert"></p>
+            <button class="btn" type="submit">Crear reunión</button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== PANEL DE LA SALA (HU5, HU6, HU7, HU8) ===== -->
+    <section class="vista" id="vista-panel" hidden>
+      <div class="cabecera-sala">
+        <div>
+          <p class="etiqueta">Reunión</p>
+          <h1 id="sala-nombre"></h1>
+        </div>
+        <div class="compartir">
+          <span class="codigo" id="sala-codigo"></span>
+          <button class="btn btn-secundario btn-chico" id="btn-copiar">Copiar link</button>
+        </div>
+      </div>
+
+      <div class="grilla-panel">
+        <div class="tarjeta">
+          <h2>Cómo estoy yo</h2>
+          <p class="sub">Solo vos ves estos valores. Nadie sabe qué marcaste.</p>
+          <div id="sliders"></div>
+          <p class="estado-guardado" id="estado-guardado" aria-live="polite"></p>
+        </div>
+
+        <div class="tarjeta">
+          <div class="titulo-con-dato">
+            <h2>Cómo está la sala</h2>
+            <span class="pildora" id="participantes">0 participantes</span>
+          </div>
+          <p class="sub">Promedio anónimo de todos los participantes activos.</p>
+          <div id="promedios"></div>
+          <p class="espera" id="espera" hidden></p>
+        </div>
+      </div>
+
+      <div class="fila-botones acciones-sala">
+        <button class="btn btn-secundario" id="btn-salir">Back</button>
+        <button class="btn btn-peligro" id="btn-finalizar" hidden>Finalizar reunión</button>
+      </div>
+    </section>
+  </main>
+
+  <div class="aviso" id="aviso" role="status" hidden></div>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
