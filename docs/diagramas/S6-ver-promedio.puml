@@ -1,0 +1,49 @@
+@startuml S6-ver-promedio
+title S6 — Ver el promedio de la sala en tiempo real (HU6)
+skinparam defaultFontName Arial
+skinparam shadowing false
+autonumber
+
+actor "Participante" as u
+participant "App web" as app
+participant "API Gateway" as gw
+participant "Servicio Status" as ss
+database "BDD Status" as db
+
+loop Cada 3 segundos mientras el Panel está abierto
+  app -> gw : GET /api/salas/{codigo}/promedio\nAuthorization: Bearer JWT
+  gw -> gw : verificarJWT()
+
+  alt JWT inválido o vencido
+    gw --> app : 401 Unauthorized
+    app --> u : "Tu sesión venció" y vuelve a Login
+  else JWT válido
+    gw -> ss : GET /salas/{codigo}/promedio\nX-Usuario-Id
+    ss -> db : findOne({ codigo }) en salas
+    db --> ss : sala
+
+    alt La sala está finalizada
+      ss --> gw : 410 Gone
+      gw --> app : 410 Gone
+      app --> u : "La reunión terminó" y vuelve a Home
+    else La sala está activa
+      ss -> db : updateOne({codigo, usuarioId},\n{ultimaActividad: ahora})
+      note right of ss : Cada consulta sirve de "sigo conectado",\naunque no se muevan los sliders
+      db --> ss : OK
+      ss -> db : find estados de la sala con\nultimaActividad en los últimos 30 s
+      db --> ss : lista de estados activos
+
+      alt Menos de 3 participantes activos
+        ss --> gw : 200 OK {participantes: n,\nminimo: 3, promedio: null}
+        gw --> app : 200 OK
+        app --> u : "Esperando más participantes…"\n(protege el anonimato)
+      else 3 o más participantes activos
+        ss -> ss : calcularPromedio() de\nEstrés, Perdido, Falta contexto, Devolución
+        ss --> gw : 200 OK {participantes: n, minimo: 3,\npromedio: {X, Y, Z, W}}
+        gw --> app : 200 OK {participantes, promedio}
+        app --> u : Actualiza el Panel de salida\n(barras X, Y, Z, W)
+      end
+    end
+  end
+end
+@enduml

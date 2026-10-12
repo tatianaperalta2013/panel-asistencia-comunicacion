@@ -1,0 +1,56 @@
+@startuml 01-microarquitectura-servidor
+title Microarquitectura del servidor (por dentro de cada servicio)
+skinparam componentStyle rectangle
+skinparam defaultFontName Arial
+skinparam shadowing false
+skinparam packageStyle rectangle
+
+component "App web" as app
+
+package "API Gateway (:3000)" #EAF7EA {
+  component "Rutas\n/api/auth/*  (públicas)\n/api/salas/* (protegidas)" as gwr
+  component "Middleware\nverificarJWT()" as gwm
+  component "Proxy\nreenvía + X-Usuario-Id\n+ X-Usuario-Nombre" as gwp
+}
+
+package "Servicio Usuarios (:4001)" #E8F1FB {
+  component "Rutas\nPOST /usuarios\nPOST /sesiones" as ur
+  component "UsuariosController\nregistrar()\nlogin()" as uc
+  component "UsuariosService\nhashPassword() (bcrypt)\ncompararPassword()\ncrearJWT()" as us
+  component "UsuarioModel\n(Mongoose)" as um
+}
+
+package "Servicio Status (:4002)" #FDF2E3 {
+  component "Rutas\nPOST /salas\nPOST /salas/:codigo/participantes\nPUT /salas/:codigo/estado\nGET /salas/:codigo/promedio\nDELETE /salas/:codigo/participantes/yo\nPATCH /salas/:codigo" as sr
+  component "SalasController\nEstadosController" as sc
+  component "SalasService\ngenerarCodigo()\nvalidarSalaActiva()\n\nEstadosService\nguardarEstado()\ncalcularPromedio()" as sv
+  component "SalaModel\nEstadoModel\n(Mongoose)" as sm
+}
+
+database "BDD Usuarios" as dbu
+database "BDD Status" as dbs
+
+app --> gwr
+gwr --> gwm
+gwm --> gwp
+gwp --> ur
+gwp --> sr
+
+ur --> uc
+uc --> us
+us --> um
+um --> dbu
+
+sr --> sc
+sc --> sv
+sv --> sm
+sm --> dbs
+
+note right of uc
+  Cada servicio sigue el mismo esquema:
+  Rutas → Controlador → Servicio → Modelo → BDD
+  (Controlador = recibe y responde HTTP,
+   Servicio = reglas de negocio,
+   Modelo = acceso a datos)
+end note
+@enduml

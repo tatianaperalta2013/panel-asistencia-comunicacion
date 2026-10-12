@@ -1,0 +1,42 @@
+@startuml S4-unirse-reunion
+title S4 — Unirse a una reunión existente (HU4)
+skinparam defaultFontName Arial
+skinparam shadowing false
+autonumber
+
+actor "Participante" as u
+participant "App web" as app
+participant "API Gateway" as gw
+participant "Servicio Status" as ss
+database "BDD Status" as db
+
+u -> app : En Home pega el link o el código\nen "Ingresar URL" y confirma
+app -> app : Extrae el código del link
+app -> gw : POST /api/salas/{codigo}/participantes\nAuthorization: Bearer JWT
+gw -> gw : verificarJWT()
+
+alt JWT inválido o vencido
+  gw --> app : 401 Unauthorized
+  app --> u : "Tu sesión venció" y vuelve a Login
+else JWT válido
+  gw -> ss : POST /salas/{codigo}/participantes\nX-Usuario-Id
+  ss -> db : findOne({ codigo })
+  db --> ss : sala o null
+
+  alt La sala no existe
+    ss --> gw : 404 Not Found
+    gw --> app : 404 Not Found
+    app --> u : "No existe una reunión con ese código"
+  else La sala está finalizada
+    ss --> gw : 410 Gone
+    gw --> app : 410 Gone
+    app --> u : "Esta reunión ya terminó"
+  else La sala está activa
+    ss -> db : upsert estado del participante\n{codigo, usuarioId, 0,0,0,0}
+    db --> ss : OK
+    ss --> gw : 200 OK {codigo, nombre, link,\nesAnfitrion}
+    gw --> app : 200 OK {codigo, nombre, link, esAnfitrion}
+    app --> u : Abre el Panel de la sala\n(sliders en 0; "Finalizar" solo si es anfitrión)
+  end
+end
+@enduml

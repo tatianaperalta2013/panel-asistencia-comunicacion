@@ -1,0 +1,47 @@
+@startuml S8-finalizar-reunion
+title S8 — El anfitrión finaliza la reunión (HU8)
+skinparam defaultFontName Arial
+skinparam shadowing false
+autonumber
+
+actor "Anfitrión" as a
+participant "App web\n(anfitrión)" as app
+participant "API Gateway" as gw
+participant "Servicio Status" as ss
+database "BDD Status" as db
+participant "App web\n(otros participantes)" as otros
+
+a -> app : Toca "Finalizar reunión" y confirma
+app -> gw : PATCH /api/salas/{codigo}\n{estado: "finalizada"}\nAuthorization: Bearer JWT
+gw -> gw : verificarJWT()
+
+alt JWT inválido o vencido
+  gw --> app : 401 Unauthorized
+  app --> a : Vuelve a Login
+else JWT válido
+  gw -> ss : PATCH /salas/{codigo} {estado}\nX-Usuario-Id
+  ss -> db : findOne({ codigo })
+  db --> ss : sala
+
+  alt El usuario no es el anfitrión
+    ss --> gw : 403 Forbidden
+    gw --> app : 403 Forbidden
+    app --> a : "Solo quien creó la reunión puede finalizarla"
+  else Es el anfitrión
+    ss -> db : updateOne({codigo}, {estado: "finalizada"})
+    db --> ss : OK
+    ss -> db : deleteMany({codigo}) en estados
+    db --> ss : OK
+    ss --> gw : 200 OK {codigo, estado: "finalizada"}
+    gw --> app : 200 OK
+    app --> a : Vuelve a Home
+  end
+end
+
+== En la siguiente consulta periódica (S6) ==
+otros -> gw : GET /api/salas/{codigo}/promedio
+gw -> ss : GET /salas/{codigo}/promedio
+ss --> gw : 410 Gone
+gw --> otros : 410 Gone
+otros -> otros : "La reunión terminó" y vuelve a Home
+@enduml

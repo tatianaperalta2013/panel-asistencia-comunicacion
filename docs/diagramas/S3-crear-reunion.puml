@@ -1,0 +1,31 @@
+@startuml S3-crear-reunion
+title S3 — Crear una nueva reunión (HU3)
+skinparam defaultFontName Arial
+skinparam shadowing false
+autonumber
+
+actor "Anfitrión" as u
+participant "App web" as app
+participant "API Gateway" as gw
+participant "Servicio Status" as ss
+database "BDD Status" as db
+
+u -> app : En Home toca "Nueva reunión"\ny escribe un nombre (opcional)
+app -> gw : POST /api/salas {nombre}\nAuthorization: Bearer JWT
+gw -> gw : verificarJWT()
+
+alt JWT inválido o vencido
+  gw --> app : 401 Unauthorized
+  app --> u : "Tu sesión venció" y vuelve a Login
+else JWT válido
+  gw -> ss : POST /salas {nombre}\nX-Usuario-Id, X-Usuario-Nombre
+  ss -> ss : generarCodigo() → "ABC123"
+  ss -> db : insertOne({codigo, nombre,\nanfitrionId, estado: "activa"})
+  db --> ss : OK
+  ss -> db : insertOne(estado inicial del anfitrión\n{codigo, usuarioId, 0,0,0,0})
+  db --> ss : OK
+  ss --> gw : 201 Created {codigo, nombre,\nlink, esAnfitrion: true}
+  gw --> app : 201 Created {codigo, nombre, link, esAnfitrion}
+  app --> u : Abre el Panel de la sala y muestra\nel código/link para compartir en el Meet
+end
+@enduml

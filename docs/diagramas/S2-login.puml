@@ -1,0 +1,40 @@
+@startuml S2-login
+title S2 — Inicio de sesión (HU2)
+skinparam defaultFontName Arial
+skinparam shadowing false
+autonumber
+
+actor "Participante" as u
+participant "App web" as app
+participant "API Gateway" as gw
+participant "Servicio Usuarios" as su
+database "BDD Usuarios" as db
+
+u -> app : Ingresa usuario y contraseña.\nToca "Log in"
+app -> gw : POST /api/auth/login\n{usuario, password}
+note right of gw : Ruta pública:\nno pide JWT
+gw -> su : POST /sesiones\n{usuario, password}
+su -> db : findOne({ usuario })
+db --> su : {_id, usuario, passwordHash} o null
+
+note right of su
+  No se hashea antes de buscar:
+  bcrypt usa una "sal" aleatoria,
+  así que se busca por usuario y
+  se compara el hash en el código.
+end note
+
+alt Usuario no existe o contraseña incorrecta
+  su -> su : bcrypt.compare(password, passwordHash) = false
+  su --> gw : 401 Unauthorized\n{mensaje: "Usuario o contraseña incorrectos"}
+  gw --> app : 401 Unauthorized {mensaje}
+  app --> u : Muestra el error (no dice cuál de los dos falló)
+else Credenciales correctas
+  su -> su : bcrypt.compare(...) = true
+  su -> su : crearJWT({id, usuario}, expira en 2 h)
+  su --> gw : 200 OK {token, usuario}
+  gw --> app : 200 OK {token, usuario}
+  app -> app : Guarda el token
+  app --> u : Muestra Home
+end
+@enduml
