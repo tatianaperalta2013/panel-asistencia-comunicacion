@@ -1,0 +1,19 @@
+{
+  "name": "servicio-usuarios",
+  "version": "1.0.0",
+  "description": "Registro y login de usuarios (bcrypt + JWT)",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.5.1"
+  }
+}
