@@ -1,0 +1,52 @@
+@startuml 4-secuencia-medicion-promedio
+title <size:18><b>Diagrama de Secuencia 3 — Medición Promedio</b></size>
+skinparam defaultFontName Arial
+skinparam shadowing false
+skinparam ParticipantBackgroundColor #FFFFFF
+skinparam ParticipantBorderColor #3C873A
+skinparam ActorBackgroundColor #EAF2FB
+skinparam ActorBorderColor #2F6FB0
+skinparam DatabaseBackgroundColor #FFF8EC
+skinparam DatabaseBorderColor #8C6D3F
+skinparam SequenceLifeLineBorderColor #9AA5B1
+skinparam NoteBackgroundColor #FBE3E4
+skinparam NoteBorderColor #A6192E
+
+actor "Usuario A (App)" as A
+actor "Usuario B (App)" as B
+participant "API Gateway" as GW
+participant "Backend Status" as ST
+database "BDD Status" as DB
+
+== <color:red>Medición Promedio</color> ==
+note over A, B: Todo arranca en 0 por defecto.\nA y B escriben el mismo código de reunión (salaId).
+
+A -> A: Mueve slider\n(actualiza Panel Entrada Anónima)
+
+loop Cada 1 segundo (cada app, de forma independiente)
+    A -[#blue]> GW: POST /status/{salaId}/valores + JWT\n{valor1..valor4}
+    GW -> GW: Valida JWT y agrega custom headers
+
+    alt JWT inválido o vencido
+        GW -[#red]-> A: 401 Unauthorized
+    else JWT válido
+        GW -[#blue]> ST: POST /status/{salaId}/valores + custom headers
+        ST -[#red]> DB: Guarda valores del usuario
+        DB --> ST: OK
+        ST -[#red]> DB: Lee valores de los usuarios de la sala
+        DB --> ST: Valores de A y B
+
+        alt Error en la BDD
+            ST -[#red]-> GW: 500 Internal Server Error
+            GW -[#red]-> A: 500 Internal Server Error
+        else Todo OK
+            ST -> ST: Calcula promedio por variable (X, Y, Z, W)
+            ST -[#red]-> GW: 200 OK {X, Y, Z, W}
+            GW -[#red]-> A: 200 OK {X, Y, Z, W}
+            A -> A: Actualiza Panel Salida Promedio
+        end
+    end
+end
+
+note over B: B hace el mismo ciclo\ny recibe los mismos promedios
+@enduml

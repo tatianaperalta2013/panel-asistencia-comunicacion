@@ -1,0 +1,43 @@
+@startuml 3-secuencia-login
+title <size:18><b>Diagrama de Secuencia 2 — Login</b></size>
+skinparam defaultFontName Arial
+skinparam shadowing false
+skinparam ParticipantBackgroundColor #FFFFFF
+skinparam ParticipantBorderColor #3C873A
+skinparam ActorBackgroundColor #EAF2FB
+skinparam ActorBorderColor #2F6FB0
+skinparam DatabaseBackgroundColor #FFF8EC
+skinparam DatabaseBorderColor #8C6D3F
+skinparam SequenceLifeLineBorderColor #9AA5B1
+skinparam NoteBackgroundColor #FBE3E4
+skinparam NoteBorderColor #A6192E
+
+actor web as w
+participant "Api Gateway" as gw
+participant "Api Usuario" as au
+database "users db" as udb
+
+autoactivate on
+== <color:red>Login</color> ==
+w-[#blue]>gw: POST /session -d {usuario:xyx, password:yxy}
+gw-[#blue]>au: POST /session -d {usuario:xyx, password:yxy}
+au-[#red]>udb: findOne({ usuario })
+udb-->au: {usuario, passwordHash} o null
+au->au: bcrypt.compare(password, passwordHash)
+au-->au: true / false
+note left au
+  busco al usuario y comparo
+  la password con el hash
+  guardado en la DB
+end note
+
+alt usuario existe y la password coincide
+  au->au: createJwt()
+  au-->au: {jwt}
+  au-[#red]->gw: HTTP 201 (created) {JWT}
+  gw-[#red]->w: HTTP 201 (created) {JWT}
+else el usuario no existe o la password no coincide
+  au-[#red]->gw: HTTP 401 (unauthorized) {mensaje_error}
+  gw-[#red]->w: HTTP 401 (unauthorized) {mensaje_error}
+end alt
+@enduml

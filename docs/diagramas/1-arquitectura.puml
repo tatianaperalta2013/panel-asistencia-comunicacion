@@ -1,0 +1,48 @@
+@startuml 1-arquitectura
+title <size:20><b>PANEL DE ASISTENCIA DE COMUNICACIÓN</b></size>\nDiagrama de Arquitectura del Sistema Completo
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam ArrowColor #555555
+skinparam ArrowThickness 1.5
+skinparam rectangle {
+  RoundCorner 14
+  BorderColor #9AA5B1
+}
+skinparam database {
+  BorderColor #8C6D3F
+  BackgroundColor #FFF8EC
+}
+skinparam note {
+  BackgroundColor #FBE3E4
+  BorderColor #A6192E
+  FontColor #7A0F1F
+}
+
+rectangle "<b>FRONTEND</b>\n<color:#5B6770>VERCEL</color>" as front #EAF2FB {
+  rectangle "<b>PANEL DE ASISTENCIA</b>\n\n<back:#E44D26><color:#FFFFFF> HTML </color></back>  <back:#264DE4><color:#FFFFFF> CSS </color></back>  <back:#F0DB4F><color:#323330> JS </color></back>" as app #FFFFFF
+}
+
+rectangle "<b>BACKEND</b>\n<color:#5B6770>RENDER</color>   <back:#3C873A><color:#FFFFFF> NODE JS </color></back>  <back:#444444><color:#FFFFFF> EXPRESS </color></back>" as back #EAF6EC {
+  rectangle "<b>API GATEWAY</b>" as gw #FFFFFF
+  rectangle "<b>USUARIOS</b>" as usu #FFFFFF
+  rectangle "<b>STATUS</b>" as sta #FFFFFF
+}
+
+rectangle "<b>BDD</b>\n<color:#5B6770>MONGODB ATLAS</color>" as bdd #FDF4E6 {
+  database "<b>BDD USUARIOS</b>\n<back:#47A248><color:#FFFFFF> MONGODB </color></back>" as dbu
+  database "<b>BDD STATUS</b>\n<back:#47A248><color:#FFFFFF> MONGODB </color></back>" as dbs
+}
+
+app -[#2F6FB0,thickness=2]-> gw : <color:#2F6FB0><b>HTTP/REST + JWT</b></color>
+gw -[#3C873A,thickness=2]-> usu : <color:#3C873A><b>HTTP/REST</b></color>\n<color:#3C873A><b>+ Custom Headers</b></color>
+gw -[#3C873A,thickness=2]-> sta : <color:#3C873A><b>HTTP/REST</b></color>\n<color:#3C873A><b>+ Custom Headers</b></color>
+usu -[#8C6D3F,thickness=2]-> dbu : <color:#8C6D3F><b>CONEXION A BDD</b></color>
+sta -[#8C6D3F,thickness=2]-> dbs : <color:#8C6D3F><b>CONEXION A BDD</b></color>
+
+note right of gw
+  <b>API GATEWAY VALIDA JWT</b>
+  <b>Y ENVIA LOS CUSTOM HEADERS</b>
+  <b>HACIA APIS</b>
+end note
+@enduml

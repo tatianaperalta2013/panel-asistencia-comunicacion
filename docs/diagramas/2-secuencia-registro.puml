@@ -1,0 +1,48 @@
+@startuml 2-secuencia-registro
+title <size:18><b>Diagrama de Secuencia 1 — Registro</b></size>
+skinparam defaultFontName Arial
+skinparam shadowing false
+skinparam ParticipantBackgroundColor #FFFFFF
+skinparam ParticipantBorderColor #3C873A
+skinparam ActorBackgroundColor #EAF2FB
+skinparam ActorBorderColor #2F6FB0
+skinparam DatabaseBackgroundColor #FFF8EC
+skinparam DatabaseBorderColor #8C6D3F
+skinparam SequenceLifeLineBorderColor #9AA5B1
+skinparam NoteBackgroundColor #FBE3E4
+skinparam NoteBorderColor #A6192E
+
+actor web as w
+participant "Api Gateway" as gw
+participant "Api Usuario" as au
+database "users db" as udb
+
+autoactivate on
+== <color:red>Registro</color> ==
+w-[#blue]>gw: POST /users -d {usuario:xyx, password:yxy}
+gw-[#blue]>au: POST /users -d {usuario:xyx, password:yxy}
+
+alt datos incompletos o contraseña de menos de 8 caracteres
+  au-[#red]->gw: HTTP 400 (bad request) {mensaje_error}
+  gw-[#red]->w: HTTP 400 (bad request) {mensaje_error}
+else datos válidos
+  au-[#red]>udb: findOne({ usuario })
+  udb-->au: {usuario} o null
+
+  alt el usuario ya existe
+    au-[#red]->gw: HTTP 409 (conflict) {mensaje_error}
+    gw-[#red]->w: HTTP 409 (conflict) {mensaje_error}
+  else usuario nuevo
+    au->au: bcrypt.hash(password)
+    au-->au: passwordHash
+    note left au
+      nunca se guarda la password,
+      se guarda su hash
+    end note
+    au-[#red]>udb: insertOne({usuario, passwordHash})
+    udb-->au: {id}
+    au-[#red]->gw: HTTP 201 (created) {id, usuario}
+    gw-[#red]->w: HTTP 201 (created) {id, usuario}
+  end
+end
+@enduml
