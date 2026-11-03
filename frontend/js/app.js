@@ -1,4 +1,4 @@
-// Lógica de la app: pantallas, llamadas al API Gateway y el ciclo de medición.
+// Lógica de la app: pantallas, llamadas al API Gateway y el ciclo de envío cada 2 segundos.
 
 // Las 4 variables del panel (valor1..valor4 → X, Y, Z, W)
 const VARIABLES = [
@@ -9,8 +9,14 @@ const VARIABLES = [
 ];
 
 let salaId = null;
-let ciclo = null;
-let envioEnCurso = false;
+let ciclo = null; // el temporizador del próximo envío
+let panelActivo = false; // true mientras el usuario está dentro de una reunión
+
+// Cada cuánto se mandan los valores (debe ser menor a 10 s, que es lo que cuenta como "activo")
+const INTERVALO_MS = 2000;
+// Si hay error, se espera más antes de reintentar, para no saturar el servidor
+const ESPERA_ERROR_MS = 5000;
+const ESPERA_429_MS = 10000; // 429 = Too Many Requests
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -41,8 +47,13 @@ function mostrar(vista) {
 
 document.querySelectorAll('[data-ir]').forEach((b) => b.addEventListener('click', () => mostrar(b.dataset.ir)));
 
+function detenerCiclo() {
+  panelActivo = false;
+  clearTimeout(ciclo);
+}
+
 function cerrarSesion() {
-  clearInterval(ciclo);
+  detenerCiclo();
   localStorage.clear();
   mostrar('login');
 }
@@ -85,6 +96,7 @@ $('#form-sala').addEventListener('submit', (e) => {
 });
 
 function abrirPanel() {
+  detenerCiclo(); // por si quedó un ciclo anterior corriendo
   $('#sala-nombre').textContent = salaId;
   $('#participantes').textContent = '';
   $('#estado').textContent = '';
@@ -111,15 +123,14 @@ function abrirPanel() {
   });
 
   mostrar('panel');
-  enviarValores();
-  ciclo = setInterval(enviarValores, 5000);
+  panelActivo = true;
+  enviarValores(); // loop: cada envío espera la respuesta antes de programar el siguiente
 }
 
 // ---------- Medición (Diagrama 2): POST /status/{salaId}/valores ----------
 async function enviarValores() {
-  if (envioEnCurso) return;
-  envioEnCurso = true;
-
+  if (!panelActivo) return;
+  let espera = INTERVALO_MS;
   const valores = {};
   VARIABLES.forEach((v) => (valores[v.valor] = Number($(`#${v.valor}`).value)));
 
@@ -131,14 +142,14 @@ async function enviarValores() {
     if (error.status === 401) {
       cerrarSesion(); // JWT inválido o vencido
       $('#form-login .error').textContent = 'Tu sesión venció, volvé a iniciar sesión';
-    } else if (error.status === 429) {
-      $('#estado').textContent = 'El servidor limitó las solicitudes; reintentando en unos segundos…';
-    } else {
-      $('#estado').textContent = 'No se pudo actualizar, reintentando…'; // 500 u otro error
+      return;
     }
-  } finally {
-    envioEnCurso = false;
+    espera = error.status === 429 ? ESPERA_429_MS : ESPERA_ERROR_MS;
+    $('#estado').textContent = 'No se pudo actualizar, reintentando…'; // 429, 500 u otro error
   }
+
+  // Programa el próximo envío solo si el usuario sigue en la reunión
+  if (panelActivo) ciclo = setTimeout(enviarValores, espera);
 }
 
 // Actualiza Panel Salida Promedio
@@ -156,7 +167,7 @@ function actualizarSalida(promedio) {
 
 // ---------- Salir de la reunión ----------
 $('#btn-salir-sala').addEventListener('click', () => {
-  clearInterval(ciclo); // deja de mandar datos: a los 10 s ya no cuenta en el promedio
+  detenerCiclo(); // deja de mandar datos: a los 10 s ya no cuenta en el promedio
   mostrar('sala');
 });
 
