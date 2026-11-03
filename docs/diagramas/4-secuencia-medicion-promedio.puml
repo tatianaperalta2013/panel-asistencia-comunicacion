@@ -23,7 +23,7 @@ note over A, B: Todo arranca en 0 por defecto.\nA y B escriben el mismo código 
 
 A -> A: Mueve slider\n(actualiza Panel Entrada Anónima)
 
-loop Cada 1 segundo (cada app, de forma independiente)
+loop Cada 5 segundos (cada app, de forma independiente)
     A -[#blue]> GW: POST /status/{salaId}/valores + JWT\n{valor1..valor4}
     GW -> GW: Valida JWT y agrega custom headers
 

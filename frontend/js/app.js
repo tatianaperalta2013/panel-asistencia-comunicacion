@@ -1,4 +1,4 @@
-// Lógica de la app: pantallas, llamadas al API Gateway y el ciclo de cada 1 segundo.
+// Lógica de la app: pantallas, llamadas al API Gateway y el ciclo de medición.
 
 // Las 4 variables del panel (valor1..valor4 → X, Y, Z, W)
 const VARIABLES = [
@@ -9,7 +9,8 @@ const VARIABLES = [
 ];
 
 let salaId = null;
-let ciclo = null; // el setInterval de cada 1 segundo
+let ciclo = null;
+let envioEnCurso = false;
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -111,11 +112,14 @@ function abrirPanel() {
 
   mostrar('panel');
   enviarValores();
-  ciclo = setInterval(enviarValores, 1000); // loop: cada 1 segundo
+  ciclo = setInterval(enviarValores, 5000);
 }
 
 // ---------- Medición (Diagrama 2): POST /status/{salaId}/valores ----------
 async function enviarValores() {
+  if (envioEnCurso) return;
+  envioEnCurso = true;
+
   const valores = {};
   VARIABLES.forEach((v) => (valores[v.valor] = Number($(`#${v.valor}`).value)));
 
@@ -127,9 +131,13 @@ async function enviarValores() {
     if (error.status === 401) {
       cerrarSesion(); // JWT inválido o vencido
       $('#form-login .error').textContent = 'Tu sesión venció, volvé a iniciar sesión';
+    } else if (error.status === 429) {
+      $('#estado').textContent = 'El servidor limitó las solicitudes; reintentando en unos segundos…';
     } else {
       $('#estado').textContent = 'No se pudo actualizar, reintentando…'; // 500 u otro error
     }
+  } finally {
+    envioEnCurso = false;
   }
 }
 
