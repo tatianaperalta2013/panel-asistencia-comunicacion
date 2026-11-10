@@ -37,10 +37,9 @@ else JWT válido
         ST -[#red]-> GW: 200 OK {codigo, nombre}
         GW -[#red]-> A: 200 OK {codigo, nombre}
         A -> A: Abre el Panel de Asistencia\n(todo arranca en 0)
-        A -[#blue]> GW: POST /status/{codigo}/valores + JWT\n{valor1..valor4}
-        note right of A: Sigue en el Diagrama 3\n(Medición promedio)
+        A -[#blue]> GW: GET /status/{codigo}/promedio + JWT
         A -[#blue]> GW: GET /status/{codigo}/historial + JWT
-        note right of A: Sigue en el Diagrama 6\n(Actualizar y gráfico)
+        note right of A: Muestra el promedio y el gráfico\n(sigue en el Diagrama 6)
     end
 end
 @enduml

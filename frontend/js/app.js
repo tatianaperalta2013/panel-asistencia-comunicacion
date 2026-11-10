@@ -88,7 +88,7 @@ function detenerPanel() {
   panelActivo = false;
 }
 
-// Avisa al backend que el usuario salió de la sala (si falla, igual deja de contar a los 45 s)
+// Avisa al backend que el usuario salió de la sala (si falla, igual deja de contar a los 10 minutos)
 function salirDeLaSala() {
   if (!panelActivo || !salaId) return;
   const sala = salaId;

@@ -1,5 +1,5 @@
 @startuml 7-secuencia-actualizar-grafico
-title <size:18><b>Diagrama de Secuencia 6 — Actualizar y gráfico de evolución</b></size>
+title <size:18><b>Diagrama de Secuencia 6 — Promedio, Actualizar y gráfico de evolución</b></size>
 skinparam defaultFontName Arial
 skinparam shadowing false
 skinparam ParticipantBackgroundColor #FFFFFF
@@ -17,14 +17,12 @@ participant "API Gateway" as GW
 participant "Backend Status" as ST
 database "BDD Status" as DB
 
-== <color:red>Botón Actualizar</color> ==
-A -> A: Toca "Actualizar"\n(el botón se desactiva mientras espera)
-
+== <color:red>Al entrar: promedio y gráfico</color> ==
 par Promedio actual
     A -[#blue]> GW: GET /status/{salaId}/promedio + JWT
     GW -> GW: Valida JWT
     GW -[#blue]> ST: GET /status/{salaId}/promedio + custom headers
-    ST -[#red]> DB: Lee valores de la sala (activos en los últimos 45 s)
+    ST -[#red]> DB: Lee valores de la sala (activos en los últimos 10 minutos)
     DB --> ST: Valores
     ST -> ST: Calcula promedio (X, Y, Z, W)
     ST -[#red]-> GW: 200 OK {X, Y, Z, W, participantes}
@@ -34,7 +32,7 @@ else Historial para el gráfico
     GW -> GW: Valida JWT
     GW -[#blue]> ST: GET /status/{salaId}/historial + custom headers
     ST -[#red]> DB: Lee puntos de los últimos 30 minutos
-    DB --> ST: Puntos (uno cada 15 s)
+    DB --> ST: Puntos
     ST -[#red]-> GW: 200 OK {minutos, puntos}
     GW -[#red]-> A: 200 OK {minutos, puntos}
 end
@@ -46,10 +44,19 @@ else Todo OK
     A -> A: Dibuja el gráfico de evolución\n(una línea por variable)
 end
 
+== <color:red>Botón Actualizar</color> ==
+A -> A: Toca «Actualizar»\n(el botón se desactiva mientras espera)
+A -[#blue]> GW: POST /status/{salaId}/valores + JWT\n{valor1..valor4}
+note right of A: Guarda los valores y trae el promedio\n(detalle en el Diagrama 3)
+GW -[#red]-> A: 200 OK {X, Y, Z, W, participantes}
+A -[#blue]> GW: GET /status/{salaId}/historial + JWT
+GW -[#red]-> A: 200 OK {minutos, puntos}
+A -> A: Actualiza el promedio, el gráfico\ny la hora de la última actualización
+
 == <color:red>Cómo se arma el historial</color> ==
 note over ST, DB
-  Con cada POST /status/{salaId}/valores el Backend Status
-  guarda un punto del promedio, como máximo uno cada 15 s por sala.
+  Cada vez que alguien toca «Actualizar» (POST /status/{salaId}/valores),
+  el Backend Status guarda un punto del promedio, como máximo uno cada 15 s por sala.
   Los puntos se borran solos a las 24 horas.
 end note
 @enduml

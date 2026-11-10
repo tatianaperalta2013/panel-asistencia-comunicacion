@@ -19,13 +19,12 @@ database "BDD Status" as DB
 
 == <color:red>Salir de la reunión</color> ==
 A -> A: Toca "Salir de la reunión" o "Cerrar sesión"
-A -> A: Corta el refresco de cada 15 s
 A -[#blue]> GW: DELETE /status/{salaId}/valores + JWT
 GW -> GW: Valida JWT
 
 alt JWT inválido o vencido
     GW -[#red]-> A: 401 Unauthorized
-    note right of A: No se muestra error: el servicio\nlo saca del promedio a los 45 s
+    note right of A: No se muestra error: el servicio\nlo saca del promedio a los 10 minutos
 else JWT válido
     GW -[#blue]> ST: DELETE /status/{salaId}/valores + custom headers
     ST -[#red]> DB: deleteOne({salaId, usuarioId})
@@ -35,5 +34,5 @@ else JWT válido
 end
 
 A -> A: Vuelve a la pantalla de Reuniones\n(o al login si cerró sesión)
-note over A: Los demás participantes ven\nun participante menos en el próximo refresco
+note over A: Los demás participantes ven un participante\nmenos la próxima vez que tocan «Actualizar»
 @enduml

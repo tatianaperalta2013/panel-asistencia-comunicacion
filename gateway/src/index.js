@@ -50,12 +50,22 @@ function reenviarA(urlApi) {
     }
     try {
       const conCuerpo = !['GET', 'HEAD', 'DELETE'].includes(req.method);
-      const respuesta = await fetch(urlApi + req.originalUrl, {
-        method: req.method,
-        headers,
-        body: conCuerpo ? JSON.stringify(req.body || {}) : undefined,
-        signal: AbortSignal.timeout(60000), // Render gratis tarda en "despertar"
-      });
+      const pedirAlServicio = () =>
+        fetch(urlApi + req.originalUrl, {
+          method: req.method,
+          headers,
+          body: conCuerpo ? JSON.stringify(req.body || {}) : undefined,
+          signal: AbortSignal.timeout(60000), // Render gratis tarda en "despertar"
+        });
+
+      // Render a veces limita (429) o está iniciando (503) el servicio: se reintenta hasta 3 veces,
+      // esperando 1 s, 2 s y 4 s, antes de devolverle el error al frontend
+      let respuesta = await pedirAlServicio();
+      for (let intento = 1; intento <= 3 && [429, 503].includes(respuesta.status); intento++) {
+        console.warn(`[gateway] ${urlApi} respondió ${respuesta.status}, reintento ${intento} de 3`);
+        await new Promise((listo) => setTimeout(listo, 1000 * 2 ** (intento - 1)));
+        respuesta = await pedirAlServicio();
+      }
       const texto = await respuesta.text();
       try {
         // Respuesta normal de nuestra API (JSON): se devuelve tal cual

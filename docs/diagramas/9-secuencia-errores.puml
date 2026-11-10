@@ -21,30 +21,34 @@ participant "Render" as R
 A -[#blue]> GW: POST /status/{salaId}/valores + JWT vencido
 GW -> GW: jwt.verify() falla
 GW -[#red]-> A: 401 Unauthorized {mensaje}
-A -> A: Corta el refresco y borra el token
+A -> A: Borra el token
 A -> A: Vuelve al login con el mensaje\n"Tu sesión venció, volvé a iniciar sesión"
 
 == <color:red>Servidor dormido, saturado o caído</color> ==
 A -[#blue]> GW: POST /status/{salaId}/valores + JWT
 GW -[#blue]> ST: POST /status/{salaId}/valores + custom headers
 
-alt Render limita los pedidos
-    R -[#red]-> GW: 429 Too Many Requests (página HTML)
-    GW -> GW: La respuesta no es JSON:\narma un mensaje claro
-    GW -[#red]-> A: 429 {mensaje: "Demasiados pedidos seguidos"}
-    A -> A: Muestra el mensaje y espera 30 s
-else El servicio se está iniciando
-    R -[#red]-> GW: 503 Service Unavailable
-    GW -[#red]-> A: 503 {mensaje: "El servicio se está iniciando"}
-    A -> A: Muestra el mensaje y espera 20 s
+alt Render limita los pedidos o el servicio se está iniciando
+    R -[#red]-> GW: 429 Too Many Requests o 503 Service Unavailable
+    loop Hasta 3 reintentos (espera 1 s, 2 s y 4 s)
+        GW -[#blue]> ST: Reintenta el mismo pedido
+    end
+    alt Algún reintento funcionó
+        ST -[#red]-> GW: 200 OK
+        GW -[#red]-> A: 200 OK (el usuario no ve ningún error)
+    else Siguió fallando
+        GW -> GW: La respuesta no es JSON:\narma un mensaje claro
+        GW -[#red]-> A: 429 / 503 {mensaje}
+        A -> A: Muestra el mensaje
+    end
 else El servicio no responde en 60 s
     GW -[#red]-> A: 504 Gateway Timeout
-    A -> A: Muestra el mensaje y espera 20 s
+    A -> A: Muestra el mensaje
 else No hay conexión con el servicio
     GW -[#red]-> A: 502 Bad Gateway
-    A -> A: Muestra el mensaje y espera 20 s
+    A -> A: Muestra el mensaje
 end
 
-A -[#blue]> GW: Reintenta el pedido
-note over A: Nunca hay dos pedidos al mismo tiempo,\nasí no se satura el servidor
+A -> A: El usuario reintenta con «Actualizar»
+note over A: La app no se actualiza sola y nunca manda\ndos pedidos al mismo tiempo: así no se satura el servidor
 @enduml

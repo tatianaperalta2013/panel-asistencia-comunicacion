@@ -19,19 +19,19 @@ skinparam note {
   FontColor #7A0F1F
 }
 
-rectangle "<b>FRONTEND</b>\n<color:#5B6770>VERCEL</color>" as front #EAF2FB {
-  rectangle "<b>PANEL DE ASISTENCIA</b>\n\n<back:#E44D26><color:#FFFFFF> HTML </color></back>  <back:#264DE4><color:#FFFFFF> CSS </color></back>  <back:#F0DB4F><color:#323330> JS </color></back>" as app #FFFFFF
+rectangle "<b>FRONTEND</b>\n<img:logos/vercel.png{scale=0.5}>" as front #EAF2FB {
+  rectangle "<b>PANEL DE ASISTENCIA</b>\n<img:logos/html5.png{scale=0.5}> <img:logos/css.png{scale=0.5}> <img:logos/javascript.png{scale=0.5}>" as app #FFFFFF
 }
 
-rectangle "<b>BACKEND</b>\n<color:#5B6770>RENDER</color>   <back:#3C873A><color:#FFFFFF> NODE JS </color></back>  <back:#444444><color:#FFFFFF> EXPRESS </color></back>" as back #EAF6EC {
-  rectangle "<b>API GATEWAY</b>" as gw #FFFFFF
-  rectangle "<b>USUARIOS</b>" as usu #FFFFFF
-  rectangle "<b>STATUS</b>" as sta #FFFFFF
+rectangle "<b>BACKEND</b>                            <img:logos/render.png{scale=0.5}>" as back #EAF6EC {
+  rectangle "<b>API GATEWAY</b>\n<img:logos/nodedotjs.png{scale=0.4}> <img:logos/express.png{scale=0.4}>" as gw #FFFFFF
+  rectangle "<b>USUARIOS</b>\n<img:logos/nodedotjs.png{scale=0.4}> <img:logos/express.png{scale=0.4}>" as usu #FFFFFF
+  rectangle "<b>STATUS</b>\n<img:logos/nodedotjs.png{scale=0.4}> <img:logos/express.png{scale=0.4}>" as sta #FFFFFF
 }
 
-rectangle "<b>BDD</b>\n<color:#5B6770>MONGODB ATLAS</color>" as bdd #FDF4E6 {
-  database "<b>BDD USUARIOS</b>\n<back:#47A248><color:#FFFFFF> MONGODB </color></back>\n<size:11>usuarios</size>" as dbu
-  database "<b>BDD STATUS</b>\n<back:#47A248><color:#FFFFFF> MONGODB </color></back>\n<size:11>salas · valores · historial</size>" as dbs
+rectangle "<b>BDD</b>\n<img:logos/mongodb.png{scale=0.5}>" as bdd #FDF4E6 {
+  database "<b>BDD USUARIOS</b>\n<size:11>usuarios</size>" as dbu
+  database "<b>BDD STATUS</b>\n<size:11>salas · valores · historial</size>" as dbs
 }
 
 app -[#2F6FB0,thickness=2]-> gw : <color:#2F6FB0><b>HTTP/REST + JWT</b></color>

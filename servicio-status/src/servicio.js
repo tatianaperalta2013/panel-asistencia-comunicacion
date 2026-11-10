@@ -1,8 +1,9 @@
 // SERVICIO: reglas de negocio del panel (Diagrama de Secuencia 2).
 const modelo = require('./modelo');
 
-// Si alguien no manda datos en 45 segundos, deja de contar en el promedio.
-const SEGUNDOS_ACTIVO = 45;
+// Si alguien no manda datos en 10 minutos (no tocó «Actualizar» o cerró la pestaña), deja de contar en el promedio.
+// Es largo porque la app no se actualiza sola: así nadie desaparece mientras sigue en la reunión.
+const SEGUNDOS_ACTIVO = 10 * 60;
 
 function error(status, mensaje) {
   const e = new Error(mensaje);

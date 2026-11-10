@@ -21,9 +21,9 @@ database "BDD Status" as DB
 == <color:red>Medición Promedio</color> ==
 note over A, B: Todo arranca en 0 por defecto.\nA y B escriben el mismo código de reunión (salaId).
 
-A -> A: Mueve slider\n(actualiza Panel Entrada Anónima, sin llamar al backend)
+A -> A: Mueve sliders\n(solo cambia el número en pantalla, sin llamar al backend)
 
-loop Al soltar un slider o cada 15 segundos (nunca dos pedidos a la vez)
+loop Cada vez que toca «Actualizar» (la app no se actualiza sola)
     A -[#blue]> GW: POST /status/{salaId}/valores + JWT\n{valor1..valor4}
     GW -> GW: Valida JWT y agrega custom headers
 
@@ -42,7 +42,7 @@ loop Al soltar un slider o cada 15 segundos (nunca dos pedidos a la vez)
         else Valores válidos
             ST -[#red]> DB: Guarda valores del usuario
             DB --> ST: OK
-            ST -[#red]> DB: Lee valores de la sala (activos en los últimos 45 s)
+            ST -[#red]> DB: Lee valores de la sala (activos en los últimos 10 minutos)
             DB --> ST: Valores de A y B
 
             alt Error en la BDD
@@ -59,10 +59,10 @@ loop Al soltar un slider o cada 15 segundos (nunca dos pedidos a la vez)
     end
 
     alt Hubo error (429, 500, 502, 503, 504 o sin conexión)
-        A -> A: Muestra el mensaje del error\ny espera 20 s (30 s si fue 429)
+        A -> A: Muestra el mensaje del error\n(puede reintentar con «Actualizar»)
         note right of A: Ver Diagrama 8
     end
 end
 
-note over B: B hace el mismo ciclo\ny recibe los mismos promedios
+note over B: B hace lo mismo con su botón\ny recibe los mismos promedios
 @enduml

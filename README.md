@@ -47,10 +47,10 @@ El sistema está compuesto por **1 frontend** (el Panel de Asistencia, hecho en 
 
 | Componente | Carpeta | Tecnología | Base de datos | Despliegue |
 |---|---|---|---|---|
-| Panel de Asistencia | `frontend/` | HTML, CSS, JavaScript | — | Vercel |
-| API Gateway | `gateway/` | Node.js + Express | — | Render |
-| API Usuarios | `servicio-usuarios/` | Node.js + Express + bcrypt | BDD Usuarios (MongoDB) | Render |
-| API Status | `servicio-status/` | Node.js + Express | BDD Status (MongoDB) | Render |
+| Panel de Asistencia | `frontend/` | <img src="docs/diagramas/logos/html5.png" alt="HTML" height="44"> <img src="docs/diagramas/logos/css.png" alt="CSS" height="44"> <img src="docs/diagramas/logos/javascript.png" alt="JavaScript" height="44"> | — | <img src="docs/diagramas/logos/vercel.png" alt="Vercel" height="44"> |
+| API Gateway | `gateway/` | <img src="docs/diagramas/logos/nodedotjs.png" alt="Node.js" height="44"> <img src="docs/diagramas/logos/express.png" alt="Express" height="44"> | — | <img src="docs/diagramas/logos/render.png" alt="Render" height="44"> |
+| API Usuarios | `servicio-usuarios/` | <img src="docs/diagramas/logos/nodedotjs.png" alt="Node.js" height="44"> <img src="docs/diagramas/logos/express.png" alt="Express" height="44"> + bcrypt | <img src="docs/diagramas/logos/mongodb.png" alt="MongoDB" height="44"> BDD Usuarios | <img src="docs/diagramas/logos/render.png" alt="Render" height="44"> |
+| API Status | `servicio-status/` | <img src="docs/diagramas/logos/nodedotjs.png" alt="Node.js" height="44"> <img src="docs/diagramas/logos/express.png" alt="Express" height="44"> | <img src="docs/diagramas/logos/mongodb.png" alt="MongoDB" height="44"> BDD Status | <img src="docs/diagramas/logos/render.png" alt="Render" height="44"> |
 
 ---
 
@@ -135,7 +135,7 @@ Criterios de aceptación:
 
 Criterios de aceptación:
 - Al tocar "Salir de la reunión" o "Cerrar sesión", la app borra los valores del usuario en esa reunión (204).
-- Si pasan 45 segundos sin tocar «Actualizar», o se cierra la pestaña, el usuario deja de contar en el promedio.
+- Si pasan 10 minutos sin tocar «Actualizar», o se cierra la pestaña, el usuario deja de contar en el promedio.
 - Los demás participantes ven un participante menos en su próximo refresco.
 
 ![Salir de la reunión](docs/diagramas/8-secuencia-salir-reunion.png)
@@ -147,7 +147,8 @@ Criterios de aceptación:
 Criterios de aceptación:
 - Si el JWT venció (401), la app vuelve al login con el mensaje "Tu sesión venció, volvé a iniciar sesión".
 - Cada código de error muestra su propio mensaje (400, 404, 429, 500, 502, 503, 504 o sin conexión).
-- Ante un error la app espera 20 segundos antes de reintentar, y 30 segundos si es un 429.
+- Si Render responde 429 o 503, el API Gateway reintenta solo hasta 3 veces (espera 1 s, 2 s y 4 s) antes de mostrar el error.
+- Ante un error, el usuario puede reintentar con «Actualizar»: la app no manda pedidos automáticos.
 - Nunca hay dos pedidos del mismo usuario al mismo tiempo, para no saturar el servidor.
 
 ![Errores](docs/diagramas/9-secuencia-errores.png)
@@ -179,7 +180,7 @@ Todas las llamadas del frontend van al API Gateway.
 | Toca **Actualizar** | `POST .../valores` + `GET .../historial` (guarda sus valores y actualiza los datos visibles) |
 | Toca **Salir de la reunión** o **Cerrar sesión** | `DELETE /status/{salaId}/valores` (deja de contar en el promedio) |
 
-Un usuario cuenta en el promedio mientras haya mandado datos en los **últimos 45 segundos**. Nunca hay dos pedidos del mismo usuario al mismo tiempo.
+Un usuario cuenta en el promedio mientras haya mandado datos en los **últimos 10 minutos**. Como la app no se actualiza sola, no hay pedidos automáticos que saturen el servidor. Nunca hay dos pedidos del mismo usuario al mismo tiempo.
 
 **Manejo de errores en el frontend**
 
