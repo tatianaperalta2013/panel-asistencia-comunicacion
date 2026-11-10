@@ -4,91 +4,171 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Panel de Asistencia de Comunicación</title>
+  <meta name="theme-color" content="#13294b" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/estilos.css" />
 </head>
 <body>
   <header class="barra">
-    <div class="marca"><span class="marca-punto"></span> Panel de Asistencia</div>
+    <div class="marca">
+      <span class="marca-icono" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span>Panel de Asistencia</span>
+    </div>
     <div class="barra-usuario" id="barra-usuario" hidden>
       <span id="nombre-usuario"></span>
-      <button class="btn-texto" id="btn-salir-sesion">Cerrar sesión</button>
+      <button class="btn-barra" id="btn-salir-sesion">Cerrar sesión</button>
     </div>
   </header>
 
   <main>
     <!-- LOGIN (Diagrama de Secuencia 1) -->
-    <section class="vista tarjeta angosta" id="vista-login" hidden>
-      <h1>Iniciar sesión</h1>
-      <p class="sub">Contá cómo te sentís en la reunión, sin que nadie sepa que fuiste vos.</p>
-      <form id="form-login">
-        <label>Usuario <input name="usuario" autocomplete="username" required /></label>
-        <label>Contraseña <input name="password" type="password" autocomplete="current-password" required /></label>
-        <p class="error"></p>
-        <button class="btn" type="submit">Log in</button>
-      </form>
-      <p class="pie-form">¿No tenés cuenta? <button class="btn-texto" data-ir="registro">Registrarse</button></p>
+    <section class="vista acceso" id="vista-login" hidden>
+      <aside class="acceso-marca">
+        <h2>Sabé cómo está la reunión, sin exponer a nadie.</h2>
+        <p>Cada participante marca su estado en privado. Todos ven solo el promedio del grupo.</p>
+        <div class="vista-previa" aria-hidden="true">
+          <div><span>Stress</span><b style="--v: 30%; --c: var(--bajo)"></b></div>
+          <div><span>Perdido</span><b style="--v: 55%; --c: var(--medio)"></b></div>
+          <div><span>Falta contexto</span><b style="--v: 80%; --c: var(--alto)"></b></div>
+          <div><span>Devuelta</span><b style="--v: 20%; --c: var(--bajo)"></b></div>
+        </div>
+      </aside>
+      <div class="acceso-form">
+        <h1>Iniciar sesión</h1>
+        <p class="sub">Entrá con tu usuario para unirte a una reunión.</p>
+        <form id="form-login">
+          <label>Usuario <input name="usuario" autocomplete="username" required /></label>
+          <label>Contraseña <input name="password" type="password" autocomplete="current-password" required /></label>
+          <p class="error" role="alert"></p>
+          <button class="btn" type="submit">Iniciar sesión</button>
+        </form>
+        <p class="pie-form">¿No tenés cuenta? <button class="btn-texto" data-ir="registro">Crear cuenta</button></p>
+      </div>
     </section>
 
     <!-- REGISTRO -->
-    <section class="vista tarjeta angosta" id="vista-registro" hidden>
-      <h1>Crear cuenta</h1>
-      <form id="form-registro">
-        <label>Usuario <input name="usuario" autocomplete="username" required /></label>
-        <label>Contraseña <input name="password" type="password" autocomplete="new-password" required />
-          <small>Al menos 8 caracteres</small></label>
-        <p class="error"></p>
-        <div class="fila-botones">
-          <button class="btn btn-secundario" type="button" data-ir="login">Back</button>
-          <button class="btn" type="submit">Crear usuario</button>
-        </div>
-      </form>
+    <section class="vista acceso" id="vista-registro" hidden>
+      <aside class="acceso-marca">
+        <h2>Tu identidad nunca se muestra en el panel.</h2>
+        <p>El usuario solo sirve para entrar. Tus valores se guardan sin tu nombre y nadie puede verlos de forma individual.</p>
+      </aside>
+      <div class="acceso-form">
+        <h1>Crear cuenta</h1>
+        <p class="sub">Elegí un usuario y una contraseña.</p>
+        <form id="form-registro">
+          <label>Usuario <input name="usuario" autocomplete="username" required /></label>
+          <label>Contraseña <input name="password" type="password" autocomplete="new-password" required />
+            <small>Al menos 8 caracteres</small></label>
+          <p class="error" role="alert"></p>
+          <div class="fila-botones">
+            <button class="btn btn-secundario" type="button" data-ir="login">Volver</button>
+            <button class="btn" type="submit">Crear cuenta</button>
+          </div>
+        </form>
+      </div>
     </section>
 
-    <!-- ELEGIR LA REUNIÓN -->
-    <section class="vista tarjeta angosta" id="vista-sala" hidden>
-      <h1>¿A qué reunión vas?</h1>
-      <p class="sub">Escribí el mismo código que tus compañeros (por ejemplo, el que pasó el profe en el chat del Meet).</p>
-      <form id="form-sala">
-        <label>Código de la reunión <input name="sala" placeholder="Ej: PP3-CLASE5" maxlength="30" required /></label>
-        <p class="error"></p>
-        <button class="btn" type="submit">Entrar</button>
-      </form>
+    <!-- ELEGIR O CREAR LA REUNIÓN -->
+    <section class="vista" id="vista-sala" hidden>
+      <div class="encabezado-pagina">
+        <h1>Reuniones</h1>
+        <p class="sub">Entrá con el código que te pasaron, o creá una reunión nueva y compartí su código.</p>
+      </div>
+      <div class="grilla-salas">
+        <div class="tarjeta">
+          <h2>Entrar con un código</h2>
+          <p class="sub">Lo comparte quien creó la reunión, por ejemplo en el chat del Meet.</p>
+          <form id="form-sala">
+            <label>Código de la reunión <input name="sala" placeholder="Ej: K7M-4QP" maxlength="7" autocomplete="off" required class="input-codigo" /></label>
+            <p class="error" role="alert"></p>
+            <button class="btn" type="submit">Entrar a la reunión</button>
+          </form>
+        </div>
+
+        <div class="tarjeta">
+          <h2>Crear una reunión</h2>
+          <p class="sub">Te damos un código único para que se sumen los demás.</p>
+          <form id="form-crear-sala">
+            <label>Nombre de la reunión <input name="nombre" placeholder="Ej: Repaso PP3" maxlength="60" required /></label>
+            <p class="error" role="alert"></p>
+            <button class="btn btn-secundario" type="submit">Crear reunión</button>
+          </form>
+          <div class="sala-creada" id="sala-creada" hidden>
+            <p class="sala-creada-titulo">Reunión creada: <strong id="creada-nombre"></strong></p>
+            <div class="codigo-grande" id="creada-codigo"></div>
+            <div class="fila-botones">
+              <button class="btn btn-secundario" type="button" id="btn-copiar-creada">Copiar código</button>
+              <button class="btn" type="button" id="btn-entrar-creada">Entrar a la reunión</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- PANEL DE ASISTENCIA (Diagrama de Secuencia 2) -->
     <section class="vista" id="vista-panel" hidden>
       <div class="cabecera-sala">
-        <div>
-          <p class="etiqueta">Reunión</p>
-          <h1 id="sala-nombre"></h1>
+        <div class="cabecera-titulo">
+          <h1 id="sala-titulo"></h1>
+          <p class="codigo-sala">Código <strong id="sala-nombre"></strong>
+            <button class="btn-texto" type="button" id="btn-copiar-codigo">Copiar</button></p>
+          <div class="cabecera-datos">
+            <span class="pildora" id="participantes"></span>
+            <span class="actualizado" id="ultima-actualizacion"></span>
+          </div>
         </div>
-        <span class="pildora" id="participantes"></span>
+        <div class="acciones-sala">
+          <button class="btn btn-secundario" id="btn-salir-sala">Salir de la reunión</button>
+          <button class="btn" id="btn-actualizar">Actualizar</button>
+        </div>
       </div>
 
       <div class="grilla-panel">
         <div class="tarjeta">
-          <h2>Entrada anónima</h2>
-          <p class="sub">Marcá cómo estás. Nadie ve tus valores.</p>
+          <div class="tarjeta-cabecera">
+            <h2>Tu estado</h2>
+            <span class="candado">Anónimo</span>
+          </div>
+          <p class="sub">Mové cada barra de 0 a 10. Nadie ve tus valores.</p>
           <div id="sliders"></div>
         </div>
-        <div class="tarjeta">
-          <h2>Salida promedio</h2>
-          <p class="sub">Cómo está la reunión en general.</p>
+        <div class="tarjeta tarjeta-salida">
+          <div class="tarjeta-cabecera">
+            <h2>Promedio de la reunión</h2>
+          </div>
+          <p class="sub">Así está el grupo en este momento.</p>
           <div id="promedios"></div>
-          <p class="estado" id="estado"></p>
+          <ul class="leyenda" aria-label="Niveles">
+            <li><i style="background: var(--bajo)"></i>Bajo (0 a 3,9)</li>
+            <li><i style="background: var(--medio)"></i>Medio (4 a 6,9)</li>
+            <li><i style="background: var(--alto)"></i>Alto (7 a 10)</li>
+          </ul>
+          <p class="estado" id="estado" role="status"></p>
         </div>
       </div>
 
-      <div class="fila-botones acciones-sala">
-        <button class="btn btn-secundario" id="btn-salir-sala">Back</button>
+      <div class="tarjeta tarjeta-grafico">
+        <div class="tarjeta-cabecera">
+          <h2>Evolución de la reunión</h2>
+          <span class="rango">Últimos 30 minutos</span>
+        </div>
+        <p class="sub">Promedio del grupo en cada momento, en una escala de 0 a 10. Pasá el mouse por el gráfico para ver cada punto.</p>
+        <ul class="leyenda-grafico" id="leyenda-grafico"></ul>
+        <div class="grafico" id="grafico">
+          <div class="grafico-tooltip" id="grafico-tooltip" hidden></div>
+        </div>
+        <details class="tabla-historial">
+          <summary>Ver los datos en una tabla</summary>
+          <div id="tabla-historial"></div>
+        </details>
       </div>
     </section>
   </main>
 
   <script src="js/config.js"></script>
+  <script src="js/grafico.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

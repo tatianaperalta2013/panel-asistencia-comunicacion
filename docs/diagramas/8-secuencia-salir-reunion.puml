@@ -1,0 +1,39 @@
+@startuml 8-secuencia-salir-reunion
+title <size:18><b>Diagrama de Secuencia 7 — Salir de la reunión</b></size>
+skinparam defaultFontName Arial
+skinparam shadowing false
+skinparam ParticipantBackgroundColor #FFFFFF
+skinparam ParticipantBorderColor #3C873A
+skinparam ActorBackgroundColor #EAF2FB
+skinparam ActorBorderColor #2F6FB0
+skinparam DatabaseBackgroundColor #FFF8EC
+skinparam DatabaseBorderColor #8C6D3F
+skinparam SequenceLifeLineBorderColor #9AA5B1
+skinparam NoteBackgroundColor #FBE3E4
+skinparam NoteBorderColor #A6192E
+
+actor "Usuario (App)" as A
+participant "API Gateway" as GW
+participant "Backend Status" as ST
+database "BDD Status" as DB
+
+== <color:red>Salir de la reunión</color> ==
+A -> A: Toca "Salir de la reunión" o "Cerrar sesión"
+A -> A: Corta el refresco de cada 15 s
+A -[#blue]> GW: DELETE /status/{salaId}/valores + JWT
+GW -> GW: Valida JWT
+
+alt JWT inválido o vencido
+    GW -[#red]-> A: 401 Unauthorized
+    note right of A: No se muestra error: el servicio\nlo saca del promedio a los 45 s
+else JWT válido
+    GW -[#blue]> ST: DELETE /status/{salaId}/valores + custom headers
+    ST -[#red]> DB: deleteOne({salaId, usuarioId})
+    DB --> ST: OK
+    ST -[#red]-> GW: 204 No Content
+    GW -[#red]-> A: 204 No Content
+end
+
+A -> A: Vuelve a la pantalla de Reuniones\n(o al login si cerró sesión)
+note over A: Los demás participantes ven\nun participante menos en el próximo refresco
+@enduml

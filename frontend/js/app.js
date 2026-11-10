@@ -1,4 +1,14 @@
-// Lógica de la app: pantallas, llamadas al API Gateway y el ciclo de envío cada 2 segundos.
+// Lógica de la app: pantallas, llamadas al API Gateway y el refresco cada 15 segundos.
+//
+// Interacción con el backend (todo pasa por el API Gateway):
+//   POST   /users                     → registro
+//   POST   /session                   → login (devuelve el JWT)
+//   POST   /salas                     → crear una reunión (devuelve un código único)
+//   GET    /salas/{codigo}            → validar que la reunión exista antes de entrar
+//   POST   /status/{salaId}/valores   → al soltar un slider y cada 15 s (guarda y devuelve el promedio)
+//   GET    /status/{salaId}/promedio  → botón "Actualizar" (solo lee, no guarda nada)
+//   GET    /status/{salaId}/historial → al entrar y con "Actualizar" (datos del gráfico de evolución)
+//   DELETE /status/{salaId}/valores   → al salir de la reunión (deja de contar en el promedio)
 
 // Las 4 variables del panel (valor1..valor4 → X, Y, Z, W)
 const VARIABLES = [
@@ -8,28 +18,63 @@ const VARIABLES = [
   { valor: 'valor4', letra: 'W', nombre: 'Devuelta' },
 ];
 
-let salaId = null;
-let ciclo = null; // el temporizador del próximo envío
-let panelActivo = false; // true mientras el usuario está dentro de una reunión
-
-// Cada cuánto se mandan los valores (debe ser menor a 10 s, que es lo que cuenta como "activo")
-const INTERVALO_MS = 2000;
+// Cada cuánto se refresca solo (el servicio de status cuenta como "activo" 45 s)
+const INTERVALO_MS = 15000;
 // Si hay error, se espera más antes de reintentar, para no saturar el servidor
-const ESPERA_ERROR_MS = 5000;
-const ESPERA_429_MS = 10000; // 429 = Too Many Requests
+const ESPERA_ERROR_MS = 20000;
+const ESPERA_429_MS = 30000; // 429 = Too Many Requests
+
+let salaId = null; // código de la reunión
+let salaNombre = ''; // nombre de la reunión
+let salaCreada = null; // última reunión creada por el usuario
+let ciclo = null; // temporizador del próximo refresco
+let panelActivo = false; // true mientras el usuario está dentro de una reunión
+let ocupado = false; // evita pedidos superpuestos
+let pendiente = false; // se movió un slider mientras había un pedido en curso
 
 const $ = (selector) => document.querySelector(selector);
 
+// ---------- Mensajes según el código de error HTTP ----------
+// Se usan cuando el servidor no manda un mensaje propio (por ejemplo, si responde Render y no nuestra API)
+const MENSAJES_ERROR = {
+  0: 'No se pudo conectar con el servidor. Revisá tu conexión.',
+  400: 'Los datos enviados no son válidos.',
+  401: 'Usuario o contraseña incorrectos, o tu sesión venció.',
+  403: 'No tenés permiso para hacer esto.',
+  404: 'No se encontró lo que pediste. Revisá el código.',
+  409: 'Ese usuario ya existe.',
+  429: 'Demasiados pedidos seguidos. Esperá unos segundos.',
+  500: 'Error interno del servidor.',
+  502: 'El servicio no responde, probá en unos segundos.',
+  503: 'El servicio se está iniciando. Esperá un minuto.',
+  504: 'El servidor tardó demasiado en responder.',
+};
+
 // ---------- Llamadas al API Gateway ----------
-async function pedir(ruta, cuerpo) {
-  const headers = { 'Content-Type': 'application/json' };
+async function pedir(metodo, ruta, cuerpo) {
+  const headers = {};
   const token = localStorage.getItem('token');
   if (token) headers.Authorization = `Bearer ${token}`;
+  if (cuerpo) headers['Content-Type'] = 'application/json';
 
-  const respuesta = await fetch(API_URL + ruta, { method: 'POST', headers, body: JSON.stringify(cuerpo) });
+  let respuesta;
+  try {
+    respuesta = await fetch(API_URL + ruta, {
+      method: metodo,
+      headers,
+      body: cuerpo ? JSON.stringify(cuerpo) : undefined,
+      signal: AbortSignal.timeout(70000), // Render gratis puede tardar ~1 min en despertar
+    });
+  } catch (error) {
+    // No hubo respuesta: sin internet, servidor caído o demoró demasiado
+    const e = new Error(error.name === 'TimeoutError' ? MENSAJES_ERROR[504] : MENSAJES_ERROR[0]);
+    e.status = error.name === 'TimeoutError' ? 504 : 0;
+    throw e;
+  }
+
   const datos = await respuesta.json().catch(() => ({}));
   if (!respuesta.ok) {
-    const e = new Error(datos.mensaje || 'Ocurrió un error');
+    const e = new Error(datos.mensaje || MENSAJES_ERROR[respuesta.status] || `Error inesperado (código ${respuesta.status})`);
     e.status = respuesta.status;
     throw e;
   }
@@ -52,54 +97,132 @@ function detenerCiclo() {
   clearTimeout(ciclo);
 }
 
+// Avisa al backend que el usuario salió de la sala (si falla, igual deja de contar a los 45 s)
+function salirDeLaSala() {
+  if (!panelActivo || !salaId) return;
+  const sala = salaId;
+  detenerCiclo();
+  pedir('DELETE', `/status/${encodeURIComponent(sala)}/valores`).catch(() => {});
+}
+
 function cerrarSesion() {
+  salirDeLaSala();
   detenerCiclo();
   localStorage.clear();
+  salaCreada = null;
+  $('#sala-creada').hidden = true;
   mostrar('login');
 }
 $('#btn-salir-sesion').addEventListener('click', cerrarSesion);
 
-// ---------- Registro ----------
+// ---------- Registro: POST /users ----------
 $('#form-registro').addEventListener('submit', async (e) => {
   e.preventDefault();
+  const boton = e.target.querySelector('button[type=submit]');
   const datos = Object.fromEntries(new FormData(e.target));
+  boton.disabled = true;
   try {
-    await pedir('/users', datos);
+    await pedir('POST', '/users', datos);
     e.target.reset();
+    e.target.querySelector('.error').textContent = '';
     mostrar('login');
     $('#form-login [name=usuario]').value = datos.usuario;
   } catch (error) {
     e.target.querySelector('.error').textContent = error.message;
+  } finally {
+    boton.disabled = false;
   }
 });
 
 // ---------- Login (Diagrama 1): POST /session → 201 {JWT} o 401 ----------
 $('#form-login').addEventListener('submit', async (e) => {
   e.preventDefault();
+  const boton = e.target.querySelector('button[type=submit]');
+  boton.disabled = true;
+  e.target.querySelector('.error').textContent = '';
   try {
-    const sesion = await pedir('/session', Object.fromEntries(new FormData(e.target)));
+    const sesion = await pedir('POST', '/session', Object.fromEntries(new FormData(e.target)));
     localStorage.setItem('token', sesion.token);
     localStorage.setItem('usuario', sesion.usuario);
     e.target.reset();
-    e.target.querySelector('.error').textContent = '';
     mostrar('sala');
   } catch (error) {
     e.target.querySelector('.error').textContent = error.message;
+  } finally {
+    boton.disabled = false;
   }
 });
 
-// ---------- Entrar a una reunión ----------
-$('#form-sala').addEventListener('submit', (e) => {
+// ---------- Copiar un código al portapapeles ----------
+async function copiar(texto, boton) {
+  const original = boton.textContent;
+  try {
+    await navigator.clipboard.writeText(texto);
+    boton.textContent = 'Código copiado';
+  } catch {
+    boton.textContent = 'No se pudo copiar';
+  }
+  setTimeout(() => (boton.textContent = original), 2000);
+}
+
+// ---------- Entrar a una reunión: GET /salas/{codigo} → 200 o 404 ----------
+$('#form-sala').addEventListener('submit', async (e) => {
   e.preventDefault();
-  salaId = new FormData(e.target).get('sala').trim().toUpperCase();
-  abrirPanel();
+  const boton = e.target.querySelector('button[type=submit]');
+  const error = e.target.querySelector('.error');
+  const codigo = new FormData(e.target).get('sala').trim().toUpperCase();
+  boton.disabled = true;
+  error.textContent = '';
+  try {
+    const sala = await pedir('GET', `/salas/${encodeURIComponent(codigo)}`);
+    e.target.reset();
+    abrirPanel(sala);
+  } catch (err) {
+    if (err.status === 401) return cerrarSesionVencida();
+    error.textContent = err.message;
+  } finally {
+    boton.disabled = false;
+  }
 });
 
-function abrirPanel() {
+// ---------- Crear una reunión: POST /salas → 201 {codigo, nombre} ----------
+$('#form-crear-sala').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const boton = e.target.querySelector('button[type=submit]');
+  const error = e.target.querySelector('.error');
+  boton.disabled = true;
+  error.textContent = '';
+  try {
+    salaCreada = await pedir('POST', '/salas', { nombre: new FormData(e.target).get('nombre') });
+    e.target.reset();
+    $('#creada-nombre').textContent = salaCreada.nombre;
+    $('#creada-codigo').textContent = salaCreada.codigo;
+    $('#sala-creada').hidden = false;
+  } catch (err) {
+    if (err.status === 401) return cerrarSesionVencida();
+    error.textContent = err.message;
+  } finally {
+    boton.disabled = false;
+  }
+});
+$('#btn-copiar-creada').addEventListener('click', (e) => copiar(salaCreada.codigo, e.target));
+$('#btn-entrar-creada').addEventListener('click', () => abrirPanel(salaCreada));
+$('#btn-copiar-codigo').addEventListener('click', (e) => copiar(salaId, e.target));
+
+function cerrarSesionVencida() {
+  cerrarSesion();
+  $('#form-login .error').textContent = 'Tu sesión venció, volvé a iniciar sesión.';
+}
+
+function abrirPanel(sala) {
   detenerCiclo(); // por si quedó un ciclo anterior corriendo
+  salaId = sala.codigo;
+  salaNombre = sala.nombre;
+  $('#sala-titulo').textContent = salaNombre;
   $('#sala-nombre').textContent = salaId;
   $('#participantes').textContent = '';
   $('#estado').textContent = '';
+  $('#ultima-actualizacion').textContent = '';
 
   // Todo arranca en 0 por defecto
   $('#sliders').innerHTML = VARIABLES.map((v) => `
@@ -112,64 +235,122 @@ function abrirPanel() {
     </div>`).join('');
 
   $('#promedios').innerHTML = VARIABLES.map((v) => `
-    <div class="promedio">
+    <div class="promedio" id="fila-${v.letra}">
       <div class="promedio-cabecera"><span>${v.nombre}</span><strong id="prom-${v.letra}">–</strong></div>
       <div class="barra-fondo"><div class="barra-relleno" id="barra-${v.letra}"></div></div>
     </div>`).join('');
 
-  // Mueve slider → actualiza Panel Entrada Anónima
   VARIABLES.forEach((v) => {
-    $(`#${v.valor}`).addEventListener('input', (e) => ($(`#ver-${v.valor}`).textContent = e.target.value));
+    const slider = $(`#${v.valor}`);
+    // Mientras se mueve: solo actualiza el número y el relleno en pantalla (no llama al backend)
+    slider.addEventListener('input', (e) => {
+      $(`#ver-${v.valor}`).textContent = e.target.value;
+      e.target.style.setProperty('--pct', `${e.target.value * 10}%`);
+    });
+    // Al soltar: manda los valores al backend
+    slider.addEventListener('change', () => enviarValores());
   });
 
   mostrar('panel');
   panelActivo = true;
-  enviarValores(); // loop: cada envío espera la respuesta antes de programar el siguiente
-}
-
-// ---------- Medición (Diagrama 2): POST /status/{salaId}/valores ----------
-async function enviarValores() {
-  if (!panelActivo) return;
-  let espera = INTERVALO_MS;
-  const valores = {};
-  VARIABLES.forEach((v) => (valores[v.valor] = Number($(`#${v.valor}`).value)));
-
-  try {
-    const promedio = await pedir(`/status/${encodeURIComponent(salaId)}/valores`, valores);
-    actualizarSalida(promedio);
-    $('#estado').textContent = '';
-  } catch (error) {
-    if (error.status === 401) {
-      cerrarSesion(); // JWT inválido o vencido
-      $('#form-login .error').textContent = 'Tu sesión venció, volvé a iniciar sesión';
-      return;
-    }
-    espera = error.status === 429 ? ESPERA_429_MS : ESPERA_ERROR_MS;
-    $('#estado').textContent = 'No se pudo actualizar, reintentando…'; // 429, 500 u otro error
-  }
-
-  // Programa el próximo envío solo si el usuario sigue en la reunión
-  if (panelActivo) ciclo = setTimeout(enviarValores, espera);
-}
-
-// Actualiza Panel Salida Promedio
-function actualizarSalida(promedio) {
-  const n = promedio.participantes;
-  $('#participantes').textContent = `${n} participante${n === 1 ? '' : 's'}`;
-  VARIABLES.forEach((v) => {
-    const valor = promedio[v.letra];
-    $(`#prom-${v.letra}`).textContent = valor.toFixed(1);
-    const barra = $(`#barra-${v.letra}`);
-    barra.style.width = `${valor * 10}%`;
-    barra.style.background = valor < 4 ? 'var(--bajo)' : valor < 7 ? 'var(--medio)' : 'var(--alto)';
+  Grafico.vaciar();
+  // Primer envío: guarda los valores y trae el historial para el gráfico; después se refresca cada 15 s
+  pedidoDelPanel(async () => {
+    const promedio = await pedir('POST', rutaSala('valores'), valoresActuales());
+    Grafico.cargar((await pedir('GET', rutaSala('historial'))).puntos);
+    return promedio;
   });
 }
 
-// ---------- Salir de la reunión ----------
+// Ejecuta un pedido del panel sin superponerse con otro y programa el próximo refresco
+async function pedidoDelPanel(hacerPedido) {
+  if (!panelActivo) return;
+  if (ocupado) {
+    pendiente = true; // se manda apenas termine el pedido actual
+    return;
+  }
+  ocupado = true;
+  clearTimeout(ciclo); // reinicia la cuenta de 15 s
+  $('#btn-actualizar').disabled = true;
+  $('#btn-actualizar').textContent = 'Actualizando…';
+  let espera = INTERVALO_MS;
+
+  try {
+    const promedio = await hacerPedido();
+    actualizarSalida(promedio);
+    Grafico.agregar(promedio);
+    $('#estado').textContent = '';
+    $('#ultima-actualizacion').textContent = `Actualizado a las ${new Date().toLocaleTimeString('es-AR')}`;
+  } catch (error) {
+    if (error.status === 401) {
+      // JWT inválido o vencido
+      ocupado = false;
+      cerrarSesionVencida();
+      return;
+    }
+    espera = error.status === 429 ? ESPERA_429_MS : ESPERA_ERROR_MS;
+    $('#estado').textContent = `${error.message} Reintento en ${espera / 1000} s.`;
+  }
+
+  ocupado = false;
+  $('#btn-actualizar').disabled = false;
+  $('#btn-actualizar').textContent = 'Actualizar';
+  // Programa el próximo refresco solo si el usuario sigue en la reunión
+  if (panelActivo) {
+    const hayCambios = pendiente && espera === INTERVALO_MS; // si hubo error, se respeta la espera
+    pendiente = false;
+    ciclo = setTimeout(enviarValores, hayCambios ? 0 : espera);
+  }
+}
+
+// ---------- Medición (Diagrama 2): POST /status/{salaId}/valores ----------
+const rutaSala = (final) => `/status/${encodeURIComponent(salaId)}/${final}`;
+
+function valoresActuales() {
+  const valores = {};
+  VARIABLES.forEach((v) => (valores[v.valor] = Number($(`#${v.valor}`).value)));
+  return valores;
+}
+
+function enviarValores() {
+  return pedidoDelPanel(() => pedir('POST', rutaSala('valores'), valoresActuales()));
+}
+
+// ---------- Botón Actualizar: GET promedio + GET historial ----------
+function consultarPromedio() {
+  return pedidoDelPanel(async () => {
+    const [promedio, historial] = await Promise.all([pedir('GET', rutaSala('promedio')), pedir('GET', rutaSala('historial'))]);
+    Grafico.cargar(historial.puntos);
+    return promedio;
+  });
+}
+$('#btn-actualizar').addEventListener('click', consultarPromedio);
+
+// Actualiza Panel Salida Promedio
+function actualizarSalida(promedio) {
+  const n = promedio.participantes || 0;
+  $('#participantes').textContent = `${n} participante${n === 1 ? '' : 's'} conectado${n === 1 ? '' : 's'}`;
+  VARIABLES.forEach((v) => {
+    const valor = Number(promedio[v.letra]) || 0;
+    $(`#prom-${v.letra}`).textContent = n ? valor.toFixed(1) : '–';
+    const barra = $(`#barra-${v.letra}`);
+    barra.style.width = n ? `${valor * 10}%` : '0';
+    const nivel = valor < 4 ? 'bajo' : valor < 7 ? 'medio' : 'alto';
+    barra.style.background = `var(--${nivel})`;
+    // Muestra la etiqueta Bajo / Medio / Alto al lado del número
+    if (n) $(`#fila-${v.letra}`).dataset.nivel = nivel;
+    else delete $(`#fila-${v.letra}`).dataset.nivel;
+  });
+}
+
+// ---------- Salir de la reunión: DELETE /status/{salaId}/valores ----------
 $('#btn-salir-sala').addEventListener('click', () => {
-  detenerCiclo(); // deja de mandar datos: a los 10 s ya no cuenta en el promedio
+  salirDeLaSala();
   mostrar('sala');
 });
+
+// Si se cierra la pestaña, deja de refrescar (el servicio lo saca del promedio a los 45 s)
+window.addEventListener('pagehide', detenerCiclo);
 
 // ---------- Al abrir la página ----------
 mostrar(localStorage.getItem('token') ? 'sala' : 'login');

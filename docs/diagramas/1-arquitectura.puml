@@ -30,8 +30,8 @@ rectangle "<b>BACKEND</b>\n<color:#5B6770>RENDER</color>   <back:#3C873A><color:
 }
 
 rectangle "<b>BDD</b>\n<color:#5B6770>MONGODB ATLAS</color>" as bdd #FDF4E6 {
-  database "<b>BDD USUARIOS</b>\n<back:#47A248><color:#FFFFFF> MONGODB </color></back>" as dbu
-  database "<b>BDD STATUS</b>\n<back:#47A248><color:#FFFFFF> MONGODB </color></back>" as dbs
+  database "<b>BDD USUARIOS</b>\n<back:#47A248><color:#FFFFFF> MONGODB </color></back>\n<size:11>usuarios</size>" as dbu
+  database "<b>BDD STATUS</b>\n<back:#47A248><color:#FFFFFF> MONGODB </color></back>\n<size:11>salas · valores · historial</size>" as dbs
 }
 
 app -[#2F6FB0,thickness=2]-> gw : <color:#2F6FB0><b>HTTP/REST + JWT</b></color>

@@ -1,0 +1,51 @@
+@startuml 5-secuencia-crear-reunion
+title <size:18><b>Diagrama de Secuencia 4 — Crear reunión</b></size>
+skinparam defaultFontName Arial
+skinparam shadowing false
+skinparam ParticipantBackgroundColor #FFFFFF
+skinparam ParticipantBorderColor #3C873A
+skinparam ActorBackgroundColor #EAF2FB
+skinparam ActorBorderColor #2F6FB0
+skinparam DatabaseBackgroundColor #FFF8EC
+skinparam DatabaseBorderColor #8C6D3F
+skinparam SequenceLifeLineBorderColor #9AA5B1
+skinparam NoteBackgroundColor #FBE3E4
+skinparam NoteBorderColor #A6192E
+
+actor "Usuario (App)" as A
+participant "API Gateway" as GW
+participant "Backend Status" as ST
+database "BDD Status" as DB
+
+== <color:red>Crear reunión</color> ==
+A -> A: Escribe el nombre de la reunión\ny toca "Crear reunión"
+A -[#blue]> GW: POST /salas + JWT\n{nombre}
+GW -> GW: Valida JWT
+
+alt JWT inválido o vencido
+    GW -[#red]-> A: 401 Unauthorized
+else JWT válido
+    GW -[#blue]> ST: POST /salas + custom headers\n{nombre}
+
+    alt Nombre con menos de 3 o más de 60 caracteres
+        ST -[#red]-> GW: 400 Bad Request {mensaje}
+        GW -[#red]-> A: 400 Bad Request {mensaje}
+        A -> A: Muestra el error debajo del campo
+    else Nombre válido
+        loop Hasta encontrar un código libre (máximo 5 intentos)
+            ST -> ST: Genera código (ej: K7M-4QP)
+            ST -[#red]> DB: insertOne({codigo, nombre, creadorId})
+            DB --> ST: OK o código repetido
+        end
+
+        alt Error en la BDD
+            ST -[#red]-> GW: 500 Internal Server Error
+            GW -[#red]-> A: 500 Internal Server Error
+        else Reunión creada
+            ST -[#red]-> GW: 201 Created {codigo, nombre}
+            GW -[#red]-> A: 201 Created {codigo, nombre}
+            A -> A: Muestra el código con los botones\n"Copiar código" y "Entrar a la reunión"
+        end
+    end
+end
+@enduml

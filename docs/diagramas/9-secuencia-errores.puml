@@ -1,0 +1,50 @@
+@startuml 9-secuencia-errores
+title <size:18><b>Diagrama de Secuencia 8 — Sesión vencida y errores del servidor</b></size>
+skinparam defaultFontName Arial
+skinparam shadowing false
+skinparam ParticipantBackgroundColor #FFFFFF
+skinparam ParticipantBorderColor #3C873A
+skinparam ActorBackgroundColor #EAF2FB
+skinparam ActorBorderColor #2F6FB0
+skinparam DatabaseBackgroundColor #FFF8EC
+skinparam DatabaseBorderColor #8C6D3F
+skinparam SequenceLifeLineBorderColor #9AA5B1
+skinparam NoteBackgroundColor #FBE3E4
+skinparam NoteBorderColor #A6192E
+
+actor "Usuario (App)" as A
+participant "API Gateway" as GW
+participant "Backend Status" as ST
+participant "Render" as R
+
+== <color:red>Sesión vencida (JWT de más de 2 horas)</color> ==
+A -[#blue]> GW: POST /status/{salaId}/valores + JWT vencido
+GW -> GW: jwt.verify() falla
+GW -[#red]-> A: 401 Unauthorized {mensaje}
+A -> A: Corta el refresco y borra el token
+A -> A: Vuelve al login con el mensaje\n"Tu sesión venció, volvé a iniciar sesión"
+
+== <color:red>Servidor dormido, saturado o caído</color> ==
+A -[#blue]> GW: POST /status/{salaId}/valores + JWT
+GW -[#blue]> ST: POST /status/{salaId}/valores + custom headers
+
+alt Render limita los pedidos
+    R -[#red]-> GW: 429 Too Many Requests (página HTML)
+    GW -> GW: La respuesta no es JSON:\narma un mensaje claro
+    GW -[#red]-> A: 429 {mensaje: "Demasiados pedidos seguidos"}
+    A -> A: Muestra el mensaje y espera 30 s
+else El servicio se está iniciando
+    R -[#red]-> GW: 503 Service Unavailable
+    GW -[#red]-> A: 503 {mensaje: "El servicio se está iniciando"}
+    A -> A: Muestra el mensaje y espera 20 s
+else El servicio no responde en 60 s
+    GW -[#red]-> A: 504 Gateway Timeout
+    A -> A: Muestra el mensaje y espera 20 s
+else No hay conexión con el servicio
+    GW -[#red]-> A: 502 Bad Gateway
+    A -> A: Muestra el mensaje y espera 20 s
+end
+
+A -[#blue]> GW: Reintenta el pedido
+note over A: Nunca hay dos pedidos al mismo tiempo,\nasí no se satura el servidor
+@enduml

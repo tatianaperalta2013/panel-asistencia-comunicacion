@@ -1,0 +1,55 @@
+@startuml 7-secuencia-actualizar-grafico
+title <size:18><b>Diagrama de Secuencia 6 — Actualizar y gráfico de evolución</b></size>
+skinparam defaultFontName Arial
+skinparam shadowing false
+skinparam ParticipantBackgroundColor #FFFFFF
+skinparam ParticipantBorderColor #3C873A
+skinparam ActorBackgroundColor #EAF2FB
+skinparam ActorBorderColor #2F6FB0
+skinparam DatabaseBackgroundColor #FFF8EC
+skinparam DatabaseBorderColor #8C6D3F
+skinparam SequenceLifeLineBorderColor #9AA5B1
+skinparam NoteBackgroundColor #FBE3E4
+skinparam NoteBorderColor #A6192E
+
+actor "Usuario (App)" as A
+participant "API Gateway" as GW
+participant "Backend Status" as ST
+database "BDD Status" as DB
+
+== <color:red>Botón Actualizar</color> ==
+A -> A: Toca "Actualizar"\n(el botón se desactiva mientras espera)
+
+par Promedio actual
+    A -[#blue]> GW: GET /status/{salaId}/promedio + JWT
+    GW -> GW: Valida JWT
+    GW -[#blue]> ST: GET /status/{salaId}/promedio + custom headers
+    ST -[#red]> DB: Lee valores de la sala (activos en los últimos 45 s)
+    DB --> ST: Valores
+    ST -> ST: Calcula promedio (X, Y, Z, W)
+    ST -[#red]-> GW: 200 OK {X, Y, Z, W, participantes}
+    GW -[#red]-> A: 200 OK {X, Y, Z, W, participantes}
+else Historial para el gráfico
+    A -[#blue]> GW: GET /status/{salaId}/historial + JWT
+    GW -> GW: Valida JWT
+    GW -[#blue]> ST: GET /status/{salaId}/historial + custom headers
+    ST -[#red]> DB: Lee puntos de los últimos 30 minutos
+    DB --> ST: Puntos (uno cada 15 s)
+    ST -[#red]-> GW: 200 OK {minutos, puntos}
+    GW -[#red]-> A: 200 OK {minutos, puntos}
+end
+
+alt La reunión no existe
+    GW -[#red]-> A: 404 Not Found
+else Todo OK
+    A -> A: Actualiza Panel Salida Promedio
+    A -> A: Dibuja el gráfico de evolución\n(una línea por variable)
+end
+
+== <color:red>Cómo se arma el historial</color> ==
+note over ST, DB
+  Con cada POST /status/{salaId}/valores el Backend Status
+  guarda un punto del promedio, como máximo uno cada 15 s por sala.
+  Los puntos se borran solos a las 24 horas.
+end note
+@enduml

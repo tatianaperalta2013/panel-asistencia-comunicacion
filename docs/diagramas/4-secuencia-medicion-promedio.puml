@@ -21,30 +21,46 @@ database "BDD Status" as DB
 == <color:red>Medición Promedio</color> ==
 note over A, B: Todo arranca en 0 por defecto.\nA y B escriben el mismo código de reunión (salaId).
 
-A -> A: Mueve slider\n(actualiza Panel Entrada Anónima)
+A -> A: Mueve slider\n(actualiza Panel Entrada Anónima, sin llamar al backend)
 
-loop Cada 5 segundos (cada app, de forma independiente)
+loop Al soltar un slider o cada 15 segundos (nunca dos pedidos a la vez)
     A -[#blue]> GW: POST /status/{salaId}/valores + JWT\n{valor1..valor4}
     GW -> GW: Valida JWT y agrega custom headers
 
     alt JWT inválido o vencido
         GW -[#red]-> A: 401 Unauthorized
+        A -> A: Cierra sesión y vuelve al login
     else JWT válido
         GW -[#blue]> ST: POST /status/{salaId}/valores + custom headers
-        ST -[#red]> DB: Guarda valores del usuario
-        DB --> ST: OK
-        ST -[#red]> DB: Lee valores de los usuarios de la sala
-        DB --> ST: Valores de A y B
 
-        alt Error en la BDD
-            ST -[#red]-> GW: 500 Internal Server Error
-            GW -[#red]-> A: 500 Internal Server Error
-        else Todo OK
-            ST -> ST: Calcula promedio por variable (X, Y, Z, W)
-            ST -[#red]-> GW: 200 OK {X, Y, Z, W}
-            GW -[#red]-> A: 200 OK {X, Y, Z, W}
-            A -> A: Actualiza Panel Salida Promedio
+        alt Valores fuera de 0 a 10
+            ST -[#red]-> GW: 400 Bad Request
+            GW -[#red]-> A: 400 Bad Request
+        else La reunión no existe
+            ST -[#red]-> GW: 404 Not Found
+            GW -[#red]-> A: 404 Not Found
+        else Valores válidos
+            ST -[#red]> DB: Guarda valores del usuario
+            DB --> ST: OK
+            ST -[#red]> DB: Lee valores de la sala (activos en los últimos 45 s)
+            DB --> ST: Valores de A y B
+
+            alt Error en la BDD
+                ST -[#red]-> GW: 500 Internal Server Error
+                GW -[#red]-> A: 500 Internal Server Error
+            else Todo OK
+                ST -> ST: Calcula promedio por variable (X, Y, Z, W)
+                ST -[#red]> DB: Guarda un punto en el historial\n(como máximo uno cada 15 s)
+                ST -[#red]-> GW: 200 OK {X, Y, Z, W, participantes}
+                GW -[#red]-> A: 200 OK {X, Y, Z, W, participantes}
+                A -> A: Actualiza Panel Salida Promedio\ny suma el punto al gráfico
+            end
         end
+    end
+
+    alt Hubo error (429, 500, 502, 503, 504 o sin conexión)
+        A -> A: Muestra el mensaje del error\ny espera 20 s (30 s si fue 429)
+        note right of A: Ver Diagrama 8
     end
 end
 

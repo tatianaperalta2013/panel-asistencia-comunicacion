@@ -31,6 +31,14 @@ function validarJWT(req, res, next) {
   }
 }
 
+// Mensajes para cuando un servicio responde algo que no es nuestra API (ej: Render despertando)
+const MENSAJES_SERVICIO = {
+  429: 'Demasiados pedidos seguidos. Esperá unos segundos',
+  502: 'El servicio no responde, probá en unos segundos',
+  503: 'El servicio se está iniciando. Esperá un minuto',
+  504: 'El servicio tardó demasiado en responder',
+};
+
 // "Reenvía request": manda el pedido a la API y devuelve la respuesta tal cual
 function reenviarA(urlApi) {
   return async (req, res) => {
@@ -41,16 +49,27 @@ function reenviarA(urlApi) {
       headers['x-usuario-nombre'] = req.usuario.nombre;
     }
     try {
+      const conCuerpo = !['GET', 'HEAD', 'DELETE'].includes(req.method);
       const respuesta = await fetch(urlApi + req.originalUrl, {
         method: req.method,
         headers,
-        body: JSON.stringify(req.body || {}),
+        body: conCuerpo ? JSON.stringify(req.body || {}) : undefined,
         signal: AbortSignal.timeout(60000), // Render gratis tarda en "despertar"
       });
       const texto = await respuesta.text();
-      res.status(respuesta.status).type('application/json').send(texto || '{}');
+      try {
+        // Respuesta normal de nuestra API (JSON): se devuelve tal cual
+        res.status(respuesta.status).json(texto ? JSON.parse(texto) : {});
+      } catch {
+        // No es JSON (por ejemplo, una página de error de Render): se arma un mensaje claro
+        console.error(`[gateway] Respuesta no JSON de ${urlApi} (código ${respuesta.status})`);
+        res.status(respuesta.status).json({ mensaje: MENSAJES_SERVICIO[respuesta.status] || 'El servicio respondió con un error' });
+      }
     } catch (e) {
       console.error('[gateway]', e.message);
+      if (e.name === 'TimeoutError') {
+        return res.status(504).json({ mensaje: 'El servicio tardó demasiado en responder' });
+      }
       res.status(502).json({ mensaje: 'El servicio no responde, probá en unos segundos' });
     }
   };
@@ -59,7 +78,22 @@ function reenviarA(urlApi) {
 // RUTAS
 app.post('/users', reenviarA(USUARIOS_URL)); // registro (pública)
 app.post('/session', reenviarA(USUARIOS_URL)); // login (pública) — Diagrama 1
-app.post('/status/:salaId/valores', validarJWT, reenviarA(STATUS_URL)); // Diagrama 2
+app.post('/salas', validarJWT, reenviarA(STATUS_URL)); // crea una reunión
+app.get('/salas/:codigo', validarJWT, reenviarA(STATUS_URL)); // valida que la reunión exista antes de entrar
+app.post('/status/:salaId/valores', validarJWT, reenviarA(STATUS_URL)); // guarda y devuelve promedio — Diagrama 2
+app.get('/status/:salaId/promedio', validarJWT, reenviarA(STATUS_URL)); // solo lee el promedio (botón Actualizar)
+app.get('/status/:salaId/historial', validarJWT, reenviarA(STATUS_URL)); // evolución del promedio (gráfico)
+app.delete('/status/:salaId/valores', validarJWT, reenviarA(STATUS_URL)); // sale de la sala
+
+// Ruta inexistente → 404 con mensaje claro
+app.use((req, res) => res.status(404).json({ mensaje: `No existe la ruta ${req.method} ${req.path}` }));
+
+// JSON mal formado u otro error inesperado → 400 / 500
+app.use((err, req, res, next) => {
+  if (err.type === 'entity.parse.failed') return res.status(400).json({ mensaje: 'El cuerpo del pedido no es un JSON válido' });
+  console.error('[gateway]', err);
+  res.status(500).json({ mensaje: 'Error interno del gateway' });
+});
 
 app.listen(PUERTO, () => {
   console.log(`[gateway] Escuchando en el puerto ${PUERTO}`);

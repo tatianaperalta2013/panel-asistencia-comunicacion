@@ -22,7 +22,12 @@ app.use((req, res, next) => {
 });
 
 // RUTAS
-app.post('/status/:salaId/valores', controlador.valores);
+app.post('/salas', controlador.crearSala); // crea una reunión con código único
+app.get('/salas/:codigo', controlador.obtenerSala); // valida que la reunión exista
+app.post('/status/:salaId/valores', controlador.valores); // guarda valores y devuelve promedio
+app.get('/status/:salaId/promedio', controlador.promedio); // solo lee el promedio
+app.get('/status/:salaId/historial', controlador.historial); // evolución del promedio (gráfico)
+app.delete('/status/:salaId/valores', controlador.salir); // borra los valores del usuario en la sala
 
 modelo
   .conectar(process.env.MONGO_URI)

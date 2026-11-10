@@ -1,0 +1,46 @@
+@startuml 6-secuencia-entrar-reunion
+title <size:18><b>Diagrama de Secuencia 5 — Entrar a una reunión</b></size>
+skinparam defaultFontName Arial
+skinparam shadowing false
+skinparam ParticipantBackgroundColor #FFFFFF
+skinparam ParticipantBorderColor #3C873A
+skinparam ActorBackgroundColor #EAF2FB
+skinparam ActorBorderColor #2F6FB0
+skinparam DatabaseBackgroundColor #FFF8EC
+skinparam DatabaseBorderColor #8C6D3F
+skinparam SequenceLifeLineBorderColor #9AA5B1
+skinparam NoteBackgroundColor #FBE3E4
+skinparam NoteBorderColor #A6192E
+
+actor "Usuario (App)" as A
+participant "API Gateway" as GW
+participant "Backend Status" as ST
+database "BDD Status" as DB
+
+== <color:red>Entrar a una reunión</color> ==
+A -> A: Escribe el código que le pasaron\ny toca "Entrar a la reunión"
+A -[#blue]> GW: GET /salas/{codigo} + JWT
+GW -> GW: Valida JWT
+
+alt JWT inválido o vencido
+    GW -[#red]-> A: 401 Unauthorized
+else JWT válido
+    GW -[#blue]> ST: GET /salas/{codigo} + custom headers
+    ST -[#red]> DB: findOne({codigo})
+    DB --> ST: reunión o null
+
+    alt La reunión no existe
+        ST -[#red]-> GW: 404 Not Found {mensaje}
+        GW -[#red]-> A: 404 Not Found {mensaje}
+        A -> A: Muestra "No existe una reunión con ese código"
+    else La reunión existe
+        ST -[#red]-> GW: 200 OK {codigo, nombre}
+        GW -[#red]-> A: 200 OK {codigo, nombre}
+        A -> A: Abre el Panel de Asistencia\n(todo arranca en 0)
+        A -[#blue]> GW: POST /status/{codigo}/valores + JWT\n{valor1..valor4}
+        note right of A: Sigue en el Diagrama 3\n(Medición promedio)
+        A -[#blue]> GW: GET /status/{codigo}/historial + JWT
+        note right of A: Sigue en el Diagrama 6\n(Actualizar y gráfico)
+    end
+end
+@enduml
