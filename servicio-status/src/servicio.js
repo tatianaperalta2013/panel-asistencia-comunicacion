@@ -1,8 +1,7 @@
 // SERVICIO: reglas de negocio del panel (Diagrama de Secuencia 2).
 const modelo = require('./modelo');
 
-// Si alguien no manda datos en 45 segundos (cerró la pestaña), deja de contar.
-// El frontend refresca cada 15 s, así que hay margen para 2 refrescos perdidos.
+// Si alguien no manda datos en 45 segundos, deja de contar en el promedio.
 const SEGUNDOS_ACTIVO = 45;
 
 function error(status, mensaje) {

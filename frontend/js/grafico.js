@@ -1,6 +1,5 @@
 // Gráfico "Evolución de la reunión": una línea por variable con el promedio del grupo en el tiempo.
-// Se dibuja con SVG, sin librerías. Los datos vienen de GET /status/{salaId}/historial
-// y se van sumando con cada respuesta de POST /status/{salaId}/valores.
+// Se dibuja con SVG, sin librerías. Los datos vienen de GET /status/{salaId}/historial.
 
 const SERIES = [
   { letra: 'X', nombre: 'Stress', color: '#2a78d6' },
@@ -9,28 +8,13 @@ const SERIES = [
   { letra: 'W', nombre: 'Devuelta', color: '#eda100' },
 ];
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const MAX_PUNTOS = 120; // 30 minutos a un punto cada 15 s
 
 const Grafico = {
   puntos: [],
 
-  // Reemplaza todos los puntos (al entrar a la reunión o al tocar Actualizar)
+  // Reemplaza todos los puntos recibidos al entrar o al actualizar manualmente.
   cargar(puntos) {
     this.puntos = puntos.map((p) => ({ ...p, fecha: new Date(p.fecha) })).filter((p) => p.participantes > 0);
-    this.dibujar();
-  },
-
-  // Suma un punto nuevo (con cada respuesta del POST), como máximo uno cada 15 s
-  agregar(promedio) {
-    if (!promedio.participantes) return;
-    const ultimo = this.puntos[this.puntos.length - 1];
-    const ahora = new Date();
-    if (ultimo && ahora - ultimo.fecha < 15000) {
-      this.puntos[this.puntos.length - 1] = { ...promedio, fecha: ultimo.fecha }; // actualiza el último
-    } else {
-      this.puntos.push({ ...promedio, fecha: ahora });
-    }
-    this.puntos = this.puntos.slice(-MAX_PUNTOS);
     this.dibujar();
   },
 

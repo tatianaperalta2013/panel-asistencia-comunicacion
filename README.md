@@ -87,7 +87,7 @@ Criterios de aceptación:
 
 Criterios de aceptación:
 - Los 4 valores arrancan en 0 y van de 0 a 10.
-- Mover un slider solo cambia el número en pantalla; los valores se envían al soltarlo y cada 15 segundos.
+- Mover un slider solo cambia el número en pantalla. El botón «Actualizar» envía los cuatro valores y refresca el promedio y el gráfico; no hay actualizaciones automáticas.
 - La respuesta trae solo el promedio de cada variable y la cantidad de participantes, nunca los valores de una persona.
 - Cada promedio muestra su nivel: Bajo (0 a 3,9), Medio (4 a 6,9) o Alto (7 a 10).
 - Un valor fuera de 0 a 10 se rechaza con un 400.
@@ -121,8 +121,8 @@ Criterios de aceptación:
 **HU6.** Como **participante o docente**, quiero **actualizar el promedio cuando lo necesito y ver cómo fue cambiando en el tiempo** para **detectar en qué momento de la clase el grupo se perdió o se estresó**.
 
 Criterios de aceptación:
-- El botón "Actualizar" pide el promedio y el historial (200) sin guardar valores nuevos, y se desactiva mientras espera.
-- El gráfico muestra una línea por variable con los últimos 30 minutos, un punto cada 15 segundos como máximo.
+- El botón «Actualizar» envía los valores actuales, pide el promedio y el historial (200), y se desactiva mientras espera.
+- El gráfico muestra una línea por variable con los últimos 30 minutos; se agrega un punto al actualizar, como máximo uno cada 15 segundos.
 - Al pasar el mouse (o el dedo) se ve la hora, la cantidad de participantes y los 4 valores de ese momento.
 - Los mismos datos se pueden ver en una tabla.
 - La pantalla muestra la hora de la última actualización.
@@ -134,8 +134,8 @@ Criterios de aceptación:
 **HU7.** Como **participante**, quiero **salir de la reunión** para que **mis valores dejen de contar en el promedio en ese momento**.
 
 Criterios de aceptación:
-- Al tocar "Salir de la reunión" o "Cerrar sesión", la app deja de refrescar y borra los valores del usuario en esa reunión (204).
-- Si la pestaña se cierra sin salir, el usuario deja de contar en el promedio a los 45 segundos.
+- Al tocar "Salir de la reunión" o "Cerrar sesión", la app borra los valores del usuario en esa reunión (204).
+- Si pasan 45 segundos sin tocar «Actualizar», o se cierra la pestaña, el usuario deja de contar en el promedio.
 - Los demás participantes ven un participante menos en su próximo refresco.
 
 ![Salir de la reunión](docs/diagramas/8-secuencia-salir-reunion.png)
@@ -174,10 +174,9 @@ Todas las llamadas del frontend van al API Gateway.
 | Acción del usuario | Pedido |
 |---|---|
 | Crea una reunión | `POST /salas` |
-| Entra con un código | `GET /salas/{codigo}` y, ya en el panel, `POST .../valores` + `GET .../historial` |
-| Suelta un slider | `POST /status/{salaId}/valores` |
-| Pasan 15 segundos sin cambios | `POST /status/{salaId}/valores` (mantiene al usuario activo y trae el promedio) |
-| Toca **Actualizar** | `GET /status/{salaId}/promedio` + `GET /status/{salaId}/historial` (solo leen, no guardan) |
+| Entra con un código | `GET /salas/{codigo}` y, ya en el panel, `GET .../promedio` + `GET .../historial` |
+| Mueve un slider | Solo actualiza el número en pantalla |
+| Toca **Actualizar** | `POST .../valores` + `GET .../historial` (guarda sus valores y actualiza los datos visibles) |
 | Toca **Salir de la reunión** o **Cerrar sesión** | `DELETE /status/{salaId}/valores` (deja de contar en el promedio) |
 
 Un usuario cuenta en el promedio mientras haya mandado datos en los **últimos 45 segundos**. Nunca hay dos pedidos del mismo usuario al mismo tiempo.
@@ -186,13 +185,13 @@ Un usuario cuenta en el promedio mientras haya mandado datos en los **últimos 4
 
 | Código | Qué ve el usuario | Qué hace la app |
 |---|---|---|
-| 0 (sin respuesta) | "No se pudo conectar con el servidor" | Reintenta en 20 s |
-| 400 | "Los datos enviados no son válidos" | Reintenta en 20 s |
+| 0 (sin respuesta) | "No se pudo conectar con el servidor" | Muestra el error; se puede reintentar con «Actualizar» |
+| 400 | "Los datos enviados no son válidos" | Muestra el error; se puede reintentar con «Actualizar» |
 | 401 | "Tu sesión venció" | Cierra la sesión y vuelve al login |
 | 404 | "No existe una reunión con ese código" | No abre el panel |
-| 429 | "Demasiados pedidos seguidos" | Espera 30 s antes de reintentar |
-| 500 | "Error interno del servidor" | Reintenta en 20 s |
-| 502 / 503 / 504 | "El servicio no responde / se está iniciando / tardó demasiado" | Reintenta en 20 s |
+| 429 | "Demasiados pedidos seguidos" | Muestra el error; se puede reintentar con «Actualizar» |
+| 500 | "Error interno del servidor" | Muestra el error; se puede reintentar con «Actualizar» |
+| 502 / 503 / 504 | "El servicio no responde / se está iniciando / tardó demasiado" | Muestra el error; se puede reintentar con «Actualizar» |
 
 El Gateway también responde con un mensaje claro cuando la ruta no existe (404), el JSON está mal formado (400) o un servicio devuelve algo que no es JSON (por ejemplo, la página de error de Render).
 

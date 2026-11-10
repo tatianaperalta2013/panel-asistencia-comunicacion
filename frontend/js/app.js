@@ -1,12 +1,12 @@
-// Lógica de la app: pantallas, llamadas al API Gateway y el refresco cada 15 segundos.
+// Lógica de la app: pantallas y llamadas manuales al API Gateway.
 //
 // Interacción con el backend (todo pasa por el API Gateway):
 //   POST   /users                     → registro
 //   POST   /session                   → login (devuelve el JWT)
 //   POST   /salas                     → crear una reunión (devuelve un código único)
 //   GET    /salas/{codigo}            → validar que la reunión exista antes de entrar
-//   POST   /status/{salaId}/valores   → al soltar un slider y cada 15 s (guarda y devuelve el promedio)
-//   GET    /status/{salaId}/promedio  → botón "Actualizar" (solo lee, no guarda nada)
+//   POST   /status/{salaId}/valores   → botón "Actualizar" (guarda los valores y devuelve el promedio)
+//   GET    /status/{salaId}/promedio  → al entrar a la reunión
 //   GET    /status/{salaId}/historial → al entrar y con "Actualizar" (datos del gráfico de evolución)
 //   DELETE /status/{salaId}/valores   → al salir de la reunión (deja de contar en el promedio)
 
@@ -18,19 +18,11 @@ const VARIABLES = [
   { valor: 'valor4', letra: 'W', nombre: 'Devuelta' },
 ];
 
-// Cada cuánto se refresca solo (el servicio de status cuenta como "activo" 45 s)
-const INTERVALO_MS = 15000;
-// Si hay error, se espera más antes de reintentar, para no saturar el servidor
-const ESPERA_ERROR_MS = 20000;
-const ESPERA_429_MS = 30000; // 429 = Too Many Requests
-
 let salaId = null; // código de la reunión
 let salaNombre = ''; // nombre de la reunión
 let salaCreada = null; // última reunión creada por el usuario
-let ciclo = null; // temporizador del próximo refresco
 let panelActivo = false; // true mientras el usuario está dentro de una reunión
 let ocupado = false; // evita pedidos superpuestos
-let pendiente = false; // se movió un slider mientras había un pedido en curso
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -92,22 +84,21 @@ function mostrar(vista) {
 
 document.querySelectorAll('[data-ir]').forEach((b) => b.addEventListener('click', () => mostrar(b.dataset.ir)));
 
-function detenerCiclo() {
+function detenerPanel() {
   panelActivo = false;
-  clearTimeout(ciclo);
 }
 
 // Avisa al backend que el usuario salió de la sala (si falla, igual deja de contar a los 45 s)
 function salirDeLaSala() {
   if (!panelActivo || !salaId) return;
   const sala = salaId;
-  detenerCiclo();
+  detenerPanel();
   pedir('DELETE', `/status/${encodeURIComponent(sala)}/valores`).catch(() => {});
 }
 
 function cerrarSesion() {
   salirDeLaSala();
-  detenerCiclo();
+  detenerPanel();
   localStorage.clear();
   salaCreada = null;
   $('#sala-creada').hidden = true;
@@ -215,7 +206,7 @@ function cerrarSesionVencida() {
 }
 
 function abrirPanel(sala) {
-  detenerCiclo(); // por si quedó un ciclo anterior corriendo
+  detenerPanel(); // por si quedó un panel anterior activo
   salaId = sala.codigo;
   salaNombre = sala.nombre;
   $('#sala-titulo').textContent = salaNombre;
@@ -247,59 +238,46 @@ function abrirPanel(sala) {
       $(`#ver-${v.valor}`).textContent = e.target.value;
       e.target.style.setProperty('--pct', `${e.target.value * 10}%`);
     });
-    // Al soltar: manda los valores al backend
-    slider.addEventListener('change', () => enviarValores());
   });
 
   mostrar('panel');
   panelActivo = true;
   Grafico.vaciar();
-  // Primer envío: guarda los valores y trae el historial para el gráfico; después se refresca cada 15 s
+  // Al entrar se muestran los datos existentes; los valores propios se envían al tocar Actualizar.
   pedidoDelPanel(async () => {
-    const promedio = await pedir('POST', rutaSala('valores'), valoresActuales());
-    Grafico.cargar((await pedir('GET', rutaSala('historial'))).puntos);
-    return promedio;
+    const [promedio, historial] = await Promise.all([
+      pedir('GET', rutaSala('promedio')),
+      pedir('GET', rutaSala('historial')),
+    ]);
+    return { promedio, historial };
   });
 }
 
-// Ejecuta un pedido del panel sin superponerse con otro y programa el próximo refresco
+// Ejecuta un pedido del panel sin superponerlo con otro.
 async function pedidoDelPanel(hacerPedido) {
   if (!panelActivo) return;
-  if (ocupado) {
-    pendiente = true; // se manda apenas termine el pedido actual
-    return;
-  }
+  if (ocupado) return;
   ocupado = true;
-  clearTimeout(ciclo); // reinicia la cuenta de 15 s
   $('#btn-actualizar').disabled = true;
   $('#btn-actualizar').textContent = 'Actualizando…';
-  let espera = INTERVALO_MS;
 
   try {
-    const promedio = await hacerPedido();
+    const { promedio, historial } = await hacerPedido();
     actualizarSalida(promedio);
-    Grafico.agregar(promedio);
+    Grafico.cargar(historial.puntos);
     $('#estado').textContent = '';
     $('#ultima-actualizacion').textContent = `Actualizado a las ${new Date().toLocaleTimeString('es-AR')}`;
   } catch (error) {
     if (error.status === 401) {
       // JWT inválido o vencido
-      ocupado = false;
       cerrarSesionVencida();
       return;
     }
-    espera = error.status === 429 ? ESPERA_429_MS : ESPERA_ERROR_MS;
-    $('#estado').textContent = `${error.message} Reintento en ${espera / 1000} s.`;
-  }
-
-  ocupado = false;
-  $('#btn-actualizar').disabled = false;
-  $('#btn-actualizar').textContent = 'Actualizar';
-  // Programa el próximo refresco solo si el usuario sigue en la reunión
-  if (panelActivo) {
-    const hayCambios = pendiente && espera === INTERVALO_MS; // si hubo error, se respeta la espera
-    pendiente = false;
-    ciclo = setTimeout(enviarValores, hayCambios ? 0 : espera);
+    $('#estado').textContent = error.message;
+  } finally {
+    ocupado = false;
+    $('#btn-actualizar').disabled = false;
+    $('#btn-actualizar').textContent = 'Actualizar';
   }
 }
 
@@ -312,19 +290,15 @@ function valoresActuales() {
   return valores;
 }
 
-function enviarValores() {
-  return pedidoDelPanel(() => pedir('POST', rutaSala('valores'), valoresActuales()));
-}
-
-// ---------- Botón Actualizar: GET promedio + GET historial ----------
-function consultarPromedio() {
+// ---------- Botón Actualizar: envía los valores y refresca promedio e historial ----------
+function actualizarManualmente() {
   return pedidoDelPanel(async () => {
-    const [promedio, historial] = await Promise.all([pedir('GET', rutaSala('promedio')), pedir('GET', rutaSala('historial'))]);
-    Grafico.cargar(historial.puntos);
-    return promedio;
+    const promedio = await pedir('POST', rutaSala('valores'), valoresActuales());
+    const historial = await pedir('GET', rutaSala('historial'));
+    return { promedio, historial };
   });
 }
-$('#btn-actualizar').addEventListener('click', consultarPromedio);
+$('#btn-actualizar').addEventListener('click', actualizarManualmente);
 
 // Actualiza Panel Salida Promedio
 function actualizarSalida(promedio) {
@@ -349,8 +323,8 @@ $('#btn-salir-sala').addEventListener('click', () => {
   mostrar('sala');
 });
 
-// Si se cierra la pestaña, deja de refrescar (el servicio lo saca del promedio a los 45 s)
-window.addEventListener('pagehide', detenerCiclo);
+// Si se cierra la pestaña, deja de considerarse activa al vencer el plazo del backend.
+window.addEventListener('pagehide', detenerPanel);
 
 // ---------- Al abrir la página ----------
 mostrar(localStorage.getItem('token') ? 'sala' : 'login');
