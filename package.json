@@ -5,7 +5,8 @@
   "description": "PP3 - Panel anónimo de estado para reuniones virtuales",
   "scripts": {
     "postinstall": "npm install --prefix servicio-usuarios && npm install --prefix servicio-status && npm install --prefix gateway",
-    "start": "node iniciar-todo.js"
+    "start": "node iniciar-todo.js",
+    "backend": "node iniciar-backend.js"
   },
   "engines": {
     "node": ">=18"
